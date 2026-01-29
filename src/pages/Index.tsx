@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -7,10 +9,56 @@ import { LeadsTable } from "@/components/dashboard/LeadsTable";
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed";
 import { EmailComposer } from "@/components/composer/EmailComposer";
 import { PerformanceChart } from "@/components/dashboard/PerformanceChart";
-import { Mail, Users, Reply, Calendar, Target, TrendingUp } from "lucide-react";
+import { Mail, Users, Reply, Calendar } from "lucide-react";
 
 const Index = () => {
   const [currentPath, setCurrentPath] = useState("/");
+  const [stats, setStats] = useState({
+    emailsSent: 0,
+    activeLeads: 0,
+    replyRate: "0%",
+    meetingsBooked: 0,
+  });
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!session) {
+        navigate("/auth");
+      }
+    });
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        navigate("/auth");
+      } else {
+        loadStats();
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  const loadStats = async () => {
+    const { data: leads } = await supabase.from("leads").select("*");
+    const { data: emails } = await supabase.from("email_logs").select("*").eq("status", "sent");
+    
+    const repliedLeads = leads?.filter(l => l.status === "replied").length || 0;
+    const totalLeads = leads?.length || 0;
+    const replyRate = totalLeads > 0 ? ((repliedLeads / totalLeads) * 100).toFixed(1) : "0";
+    
+    setStats({
+      emailsSent: emails?.length || 0,
+      activeLeads: totalLeads,
+      replyRate: `${replyRate}%`,
+      meetingsBooked: leads?.filter(l => l.status === "meeting").length || 0,
+    });
+  };
+
+  const handleNavigate = (path: string) => {
+    setCurrentPath(path);
+    navigate(path);
+  };
 
   const campaigns = [
     {
@@ -41,12 +89,12 @@ const Index = () => {
 
   return (
     <div className="flex h-screen bg-background">
-      <Sidebar currentPath={currentPath} onNavigate={setCurrentPath} />
+      <Sidebar currentPath={currentPath} onNavigate={handleNavigate} />
       
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header 
           title="Dashboard" 
-          onNewCampaign={() => console.log("New campaign")} 
+          onNewCampaign={() => navigate("/leads")} 
         />
         
         <main className="flex-1 overflow-y-auto">
@@ -55,7 +103,7 @@ const Index = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <StatCard
                 title="Emails Sent"
-                value="12,847"
+                value={stats.emailsSent.toLocaleString()}
                 change={{ value: "+12.5%", trend: "up" }}
                 icon={Mail}
                 iconColor="text-primary"
@@ -63,7 +111,7 @@ const Index = () => {
               />
               <StatCard
                 title="Active Leads"
-                value="1,429"
+                value={stats.activeLeads.toLocaleString()}
                 change={{ value: "+8.2%", trend: "up" }}
                 icon={Users}
                 iconColor="text-accent"
@@ -71,7 +119,7 @@ const Index = () => {
               />
               <StatCard
                 title="Reply Rate"
-                value="4.8%"
+                value={stats.replyRate}
                 change={{ value: "+0.6%", trend: "up" }}
                 icon={Reply}
                 iconColor="text-success"
@@ -79,7 +127,7 @@ const Index = () => {
               />
               <StatCard
                 title="Meetings Booked"
-                value="48"
+                value={stats.meetingsBooked.toString()}
                 change={{ value: "+23%", trend: "up" }}
                 icon={Calendar}
                 iconColor="text-warning"
