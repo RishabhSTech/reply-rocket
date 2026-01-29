@@ -14,7 +14,179 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      email_logs: {
+        Row: {
+          body: string
+          created_at: string
+          error_message: string | null
+          id: string
+          lead_id: string | null
+          sent_at: string | null
+          status: string
+          subject: string
+          to_email: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          lead_id?: string | null
+          sent_at?: string | null
+          status?: string
+          subject: string
+          to_email: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          lead_id?: string | null
+          sent_at?: string | null
+          status?: string
+          subject?: string
+          to_email?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_logs_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leads: {
+        Row: {
+          created_at: string
+          email: string | null
+          founder_linkedin: string | null
+          id: string
+          name: string
+          position: string
+          requirement: string
+          status: string
+          updated_at: string
+          user_id: string
+          website_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          founder_linkedin?: string | null
+          id?: string
+          name: string
+          position: string
+          requirement: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          website_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          founder_linkedin?: string | null
+          id?: string
+          name?: string
+          position?: string
+          requirement?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          website_url?: string | null
+        }
+        Relationships: []
+      }
+      smtp_settings: {
+        Row: {
+          created_at: string
+          from_email: string
+          from_name: string
+          host: string
+          id: string
+          is_verified: boolean
+          password: string
+          port: number
+          updated_at: string
+          user_id: string
+          username: string
+        }
+        Insert: {
+          created_at?: string
+          from_email: string
+          from_name: string
+          host: string
+          id?: string
+          is_verified?: boolean
+          password: string
+          port?: number
+          updated_at?: string
+          user_id: string
+          username: string
+        }
+        Update: {
+          created_at?: string
+          from_email?: string
+          from_name?: string
+          host?: string
+          id?: string
+          is_verified?: boolean
+          password?: string
+          port?: number
+          updated_at?: string
+          user_id?: string
+          username?: string
+        }
+        Relationships: []
+      }
+      warmup_settings: {
+        Row: {
+          created_at: string
+          current_daily_limit: number
+          enabled: boolean
+          id: string
+          max_daily_limit: number
+          ramp_up_rate: number
+          send_window_end: number
+          send_window_start: number
+          timezone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_daily_limit?: number
+          enabled?: boolean
+          id?: string
+          max_daily_limit?: number
+          ramp_up_rate?: number
+          send_window_end?: number
+          send_window_start?: number
+          timezone?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_daily_limit?: number
+          enabled?: boolean
+          id?: string
+          max_daily_limit?: number
+          ramp_up_rate?: number
+          send_window_end?: number
+          send_window_start?: number
+          timezone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
