@@ -62,7 +62,7 @@ export function CampaignInbox({ campaignId }: CampaignInboxProps) {
                     subject: r.subject,
                     preview: r.body.substring(0, 50) + (r.body.length > 50 ? "..." : ""),
                     date: new Date(r.received_at).toLocaleDateString(),
-                    status: r.is_read ? "read" : "unread" as const,
+                    status: (r.is_read ? "read" : "unread") as "read" | "unread",
                     body: r.body,
                     receivedAt: r.received_at,
                 }));
@@ -97,7 +97,7 @@ export function CampaignInbox({ campaignId }: CampaignInboxProps) {
         }
     };
 
-    const selectedThread = threads.find(t => t.id === selectedThreadId);
+
 
     return (
         <div className="grid grid-cols-12 gap-0 h-[600px] border rounded-lg overflow-hidden bg-background">

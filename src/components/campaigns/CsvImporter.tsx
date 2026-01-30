@@ -27,9 +27,22 @@ export function CsvImporter({ campaignId, onImportComplete }: CsvImporterProps) 
         }
     }, []);
 
+    const sanitizeValue = (value: string) => {
+        const trimmed = value.trim();
+        // Prevent CSV injection (formula injection)
+        if (['=', '+', '-', '@'].some(char => trimmed.startsWith(char))) {
+            return "'" + trimmed;
+        }
+        return trimmed;
+    };
+
     const parseCSV = (text: string) => {
         const lines = text.split('\n');
-        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        // Handle potential empty lines at header
+        const headerLine = lines.find(l => l.trim().length > 0);
+        if (!headerLine) throw new Error("CSV file is empty");
+
+        const headers = headerLine.split(',').map(h => h.trim().toLowerCase());
 
         // Required fields mapping
         const emailIdx = headers.findIndex(h => h.includes('email'));
@@ -43,23 +56,29 @@ export function CsvImporter({ campaignId, onImportComplete }: CsvImporterProps) 
             throw new Error("CSV must contain an 'email' column");
         }
 
-        return lines.slice(1)
+        // Simple regex for email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        return lines.slice(lines.indexOf(headerLine) + 1)
             .filter(line => line.trim() !== '')
             .map(line => {
-                // Handle quoted values better in production, simpler split for now
+                // Determine if we need to handle quotes (basic check)
+                // This is still a basic parser; for production a library like PapaParse is recommended
                 const values = line.split(',');
+
+                const email = sanitizeValue(values[emailIdx] || '');
+
                 return {
-                    email: values[emailIdx]?.trim() || '',
-                    name: nameIdx !== -1 ? values[nameIdx]?.trim() : 'Unknown',
-                    position: positionIdx !== -1 ? values[positionIdx]?.trim() : '',
+                    email: email,
+                    name: sanitizeValue(nameIdx !== -1 ? values[nameIdx] || 'Unknown' : 'Unknown'),
+                    position: sanitizeValue(positionIdx !== -1 ? values[positionIdx] || '' : ''),
                     requirement: '', // Default requirement
-                    founder_linkedin: linkedInIdx !== -1 ? values[linkedInIdx]?.trim() : null,
-                    website_url: websiteIdx !== -1 ? values[websiteIdx]?.trim() : null,
-                    // Default fields
+                    founder_linkedin: linkedInIdx !== -1 ? sanitizeValue(values[linkedInIdx] || '') : null,
+                    website_url: websiteIdx !== -1 ? sanitizeValue(values[websiteIdx] || '') : null,
                     status: 'pending',
                 };
             })
-            .filter(row => row.email && row.email.includes('@')); // Basic validation
+            .filter(row => row.email && emailRegex.test(row.email));
     };
 
     const handleUpload = async () => {
