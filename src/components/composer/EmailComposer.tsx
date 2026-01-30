@@ -96,6 +96,9 @@ export function EmailComposer({ className }: EmailComposerProps) {
     setBody("");
 
     try {
+      // Get selected AI provider from settings
+      const provider = localStorage.getItem('ai_provider') || 'lovable';
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-email`,
         {
@@ -112,6 +115,7 @@ export function EmailComposer({ className }: EmailComposerProps) {
             leadWebsite: selectedLead.website_url,
             tone,
             companyInfo: companyInfo || {},
+            provider, // Include selected AI provider
           }),
         }
       );
@@ -376,7 +380,7 @@ export function EmailComposer({ className }: EmailComposerProps) {
                 <RefreshCw className={cn("w-4 h-4", isGenerating && "animate-spin")} />
                 Regenerate
               </Button>
-              <Button 
+              <Button
                 className="flex-1 gap-2"
                 onClick={handleSendEmail}
                 disabled={isSending || !selectedLead?.email}
