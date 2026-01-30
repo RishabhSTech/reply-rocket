@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Mail, MousePointerClick, MessageSquare, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Users, Mail, MousePointerClick, MessageSquare, Loader2, RefreshCw } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface CampaignOverviewProps {
     campaign: any;
@@ -140,8 +142,11 @@ export function CampaignOverview({ campaign }: CampaignOverviewProps) {
             </div>
 
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle>Campaign Status</CardTitle>
+                    <Button variant="ghost" size="icon" onClick={loadStats} disabled={loading}>
+                        <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+                    </Button>
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-2">

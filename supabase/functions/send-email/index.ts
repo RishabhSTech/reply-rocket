@@ -132,7 +132,11 @@ serve(async (req: Request) => {
     }
 
     // 2. Append tracking pixel
-    const trackingUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/track-email?id=${logEntry.id}`;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const trackingUrlObj = new URL(`${supabaseUrl}/functions/v1/track-email`);
+    trackingUrlObj.searchParams.set("id", logEntry.id);
+    const trackingUrl = trackingUrlObj.toString();
+
     const trackingPixel = `<img src="${trackingUrl}" width="1" height="1" style="display:none;" alt="" />`;
 
     // Convert newlines to BR and append pixel
