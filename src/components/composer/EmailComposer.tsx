@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Sparkles, Copy, RefreshCw, Send, Wand2, Users, Loader2, Eye, EyeOff } from "lucide-react";
+import { Sparkles, Copy, RefreshCw, Send, Wand2, Users, Loader2, Eye, EyeOff, AlertCircle } from "lucide-react";
 
 interface Lead {
   id: string;
@@ -59,6 +59,25 @@ export function EmailComposer({ className }: EmailComposerProps) {
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Helper function to log errors
+  const logError = async (component: string, message: string, details?: any) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      await supabase.from("error_logs").insert({
+        user_id: user.id,
+        component,
+        error_message: message,
+        error_details: details,
+      });
+
+      console.error(`[${component}] ${message}`, details);
+    } catch (err) {
+      console.error("Failed to log error:", err);
+    }
+  };
 
   useEffect(() => {
     loadLeads();
@@ -154,13 +173,18 @@ export function EmailComposer({ className }: EmailComposerProps) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const { data: smtpSettings } = await supabase
+      const { data: smtpSettings, error: smtpError } = await supabase
         .from("smtp_settings")
         .select("from_name")
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
+
+      console.log("📧 SMTP Settings:", smtpSettings);
+      console.log("❌ SMTP Error:", smtpError);
 
       const senderName = smtpSettings?.from_name || user?.user_metadata?.full_name || user?.user_metadata?.name || "Founder";
+      console.log("✅ Sender Name for signature:", senderName);
+      
       const signature = `\n\nLooking forward to hearing from you\n${senderName}`;
 
       setBody((data.body || "") + signature);
@@ -171,6 +195,11 @@ export function EmailComposer({ className }: EmailComposerProps) {
       });
     } catch (error) {
       console.error("Generation error:", error);
+      await logError(
+        "EmailComposer",
+        error instanceof Error ? error.message : "Unknown generation error",
+        { error: String(error) }
+      );
       toast({
         title: "Generation failed",
         description: error instanceof Error ? error.message : "Failed to generate email",
@@ -267,6 +296,11 @@ export function EmailComposer({ className }: EmailComposerProps) {
       }, 1500);
     } catch (error) {
       console.error("Send error:", error);
+      await logError(
+        "EmailComposer",
+        error instanceof Error ? error.message : "Unknown send error",
+        { error: String(error), leadEmail: selectedLead?.email }
+      );
       toast({
         title: "Send failed",
         description: error instanceof Error ? error.message : "Failed to send email",

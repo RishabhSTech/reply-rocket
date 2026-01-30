@@ -12,6 +12,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Zap,
+  AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -30,6 +31,7 @@ const navItems: NavItem[] = [
   { icon: MessageSquare, label: "Inbox", href: "/inbox" },
   { icon: Calendar, label: "Meetings", href: "/meetings" },
   { icon: BarChart3, label: "Analytics", href: "/analytics" },
+  { icon: AlertCircle, label: "Error Logs", href: "/error-logs" },
 ];
 
 interface SidebarProps {
