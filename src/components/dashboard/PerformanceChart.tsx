@@ -1,6 +1,5 @@
+import { useState, useEffect } from "react";
 import {
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -8,19 +7,87 @@ import {
   ResponsiveContainer,
   Area,
   AreaChart,
+  Line,
 } from "recharts";
+import { supabase } from "@/integrations/supabase/client";
 
-const data = [
-  { name: "Mon", opens: 42, clicks: 24, replies: 8 },
-  { name: "Tue", opens: 53, clicks: 28, replies: 12 },
-  { name: "Wed", opens: 49, clicks: 22, replies: 10 },
-  { name: "Thu", opens: 68, clicks: 35, replies: 18 },
-  { name: "Fri", opens: 72, clicks: 42, replies: 22 },
-  { name: "Sat", opens: 38, clicks: 18, replies: 6 },
-  { name: "Sun", opens: 35, clicks: 15, replies: 5 },
-];
+interface DayData {
+  name: string;
+  opens: number;
+  clicks: number;
+  replies: number;
+}
 
 export function PerformanceChart() {
+  const [data, setData] = useState<DayData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadChartData();
+  }, []);
+
+  const loadChartData = async () => {
+    try {
+      const now = new Date();
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+      const [{ data: emails }, { data: replies }] = await Promise.all([
+        supabase
+          .from("email_logs")
+          .select("*")
+          .gte("created_at", sevenDaysAgo.toISOString()),
+        supabase
+          .from("email_replies")
+          .select("*")
+          .gte("received_at", sevenDaysAgo.toISOString()),
+      ]);
+
+      const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const chartData: DayData[] = [];
+
+      for (let i = 6; i >= 0; i--) {
+        const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+        const dateStr = date.toISOString().split("T")[0];
+        const dayName = dayNames[date.getDay()];
+
+        const dayEmails = emails?.filter((e) => {
+          const emailDate = new Date(e.created_at).toISOString().split("T")[0];
+          return emailDate === dateStr;
+        }) || [];
+
+        const dayReplies = replies?.filter((r) => {
+          const replyDate = new Date(r.received_at).toISOString().split("T")[0];
+          return replyDate === dateStr;
+        }) || [];
+
+        chartData.push({
+          name: dayName,
+          opens: dayEmails.filter((e) => e.opened_at).length,
+          clicks: dayEmails.filter((e) => e.clicked_at).length,
+          replies: dayReplies.length,
+        });
+      }
+
+      setData(chartData);
+    } catch (error) {
+      console.error("Error loading chart data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="bg-card rounded-xl border border-border p-5 animate-pulse">
+        <div className="mb-5">
+          <div className="h-5 bg-muted rounded w-40 mb-2" />
+          <div className="h-4 bg-muted rounded w-56" />
+        </div>
+        <div className="h-[280px] bg-muted rounded" />
+      </div>
+    );
+  }
+
   return (
     <div className="bg-card rounded-xl border border-border p-5 animate-slide-up">
       <div className="mb-5">
