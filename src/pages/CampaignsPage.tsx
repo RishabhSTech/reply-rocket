@@ -321,7 +321,8 @@ const CampaignsPage = () => {
               {campaigns.map((campaign) => (
                 <Card
                   key={campaign.id}
-                  className="hover:shadow-md transition-shadow"
+                  className="hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => navigate(`/campaigns/${campaign.id}`)}
                 >
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <div className="flex items-center gap-3">
@@ -344,7 +345,10 @@ const CampaignsPage = () => {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => toggleCampaignStatus(campaign)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleCampaignStatus(campaign);
+                        }}
                       >
                         {campaign.status === "active" ? (
                           <Pause className="h-4 w-4" />
@@ -354,7 +358,11 @@ const CampaignsPage = () => {
                       </Button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
