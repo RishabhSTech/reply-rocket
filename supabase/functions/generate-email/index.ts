@@ -311,16 +311,26 @@ async function callLovable(messages: any[]): Promise<string> {
  */
 function parseEmailResponse(content: string): { subject: string; body: string } {
   try {
+    // Try to find JSON object in response
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
+      
+      console.log("✅ Successfully parsed JSON response:");
+      console.log("   - Subject:", parsed.subject?.substring(0, 50));
+      console.log("   - Body length:", parsed.body?.length);
+      
       return {
         subject: parsed.subject || "Quick question",
         body: parsed.body || content,
       };
+    } else {
+      console.warn("⚠️ No JSON found in response. Raw response:");
+      console.log(content.substring(0, 500));
     }
   } catch (error) {
-    console.error("Failed to parse JSON:", error);
+    console.error("❌ Failed to parse JSON:", error);
+    console.error("Raw content:", content.substring(0, 500));
   }
 
   return {
@@ -336,9 +346,9 @@ serve(async (req) => {
 
   try {
     const request: GenerateEmailRequest = await req.json();
-    const provider = request.provider || 'lovable';
+    const provider = request.provider || 'openai'; // Default to OpenAI
 
-    // Log request details for debugging
+    // Log request details
     console.log("📧 Email Generation Request:");
     console.log("  - Lead:", request.leadName, `(${request.leadPosition})`);
     console.log("  - Provider:", provider);
@@ -347,11 +357,25 @@ serve(async (req) => {
     const systemPrompt = buildSystemPrompt(request.companyInfo, request.contextJson, request.campaignContext);
     const userPrompt = buildUserPrompt(request);
 
+    // DEBUG: Log exact system prompt being sent
+    console.log("\n🔍 SYSTEM PROMPT BEING SENT:");
+    console.log("=====================================");
+    console.log(systemPrompt);
+    console.log("=====================================\n");
+
+    // DEBUG: Log user prompt
+    console.log("🔍 USER PROMPT BEING SENT:");
+    console.log("=====================================");
+    console.log(userPrompt);
+    console.log("=====================================\n");
+
     // Call AI provider
     const content = await callAIProvider(provider, systemPrompt, userPrompt);
 
     // Parse response
     const emailData = parseEmailResponse(content);
+
+    console.log("✅ Email generated successfully");
 
     return new Response(JSON.stringify(emailData), {
       status: 200,
