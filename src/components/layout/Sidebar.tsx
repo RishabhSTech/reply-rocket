@@ -24,10 +24,10 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { icon: LayoutDashboard, label: "Dashboard", href: "/" },
-  { icon: Mail, label: "Campaigns", href: "/campaigns", badge: "3" },
+  { icon: Mail, label: "Campaigns", href: "/campaigns" },
   { icon: Users, label: "Leads", href: "/leads" },
   { icon: Sparkles, label: "AI Composer", href: "/compose" },
-  { icon: MessageSquare, label: "Inbox", href: "/inbox", badge: "12" },
+  { icon: MessageSquare, label: "Inbox", href: "/inbox" },
   { icon: Calendar, label: "Meetings", href: "/meetings" },
   { icon: BarChart3, label: "Analytics", href: "/analytics" },
 ];

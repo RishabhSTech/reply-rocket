@@ -231,6 +231,12 @@ export function EmailComposer({ className }: EmailComposerProps) {
         sent_at: new Date().toISOString(),
       });
 
+      // Update lead's campaign_id if not already set
+      await supabase
+        .from("leads")
+        .update({ campaign_id: selectedCampaignId })
+        .eq("id", selectedLead.id);
+
       // Clear form
       setSubject("");
       setBody("");
