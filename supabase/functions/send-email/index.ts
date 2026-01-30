@@ -105,7 +105,30 @@ serve(async (req: Request) => {
 
     // Generate email content if not provided
     const emailSubject = subject || `Quick question for ${lead?.name || "you"}`;
-    const emailBody = body || generateEmailBody(lead, smtpSettings.from_name);
+    let emailBody = body || generateEmailBody(lead, smtpSettings.from_name);
+
+    // 1. Insert log first with 'pending' status to get the ID
+    const { data: logEntry, error: logError } = await supabase.from("email_logs").insert({
+      user_id: userId,
+      lead_id: leadId,
+      to_email: toEmail,
+      subject: emailSubject,
+      body: emailBody, // We store original body without pixel
+      status: "pending",
+      sent_at: new Date().toISOString(),
+    }).select().single();
+
+    if (logError || !logEntry) {
+      console.error("Failed to create log entry:", logError);
+      throw new Error("Failed to initialize email tracking");
+    }
+
+    // 2. Append tracking pixel
+    const trackingUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/track-email?id=${logEntry.id}`;
+    const trackingPixel = `<img src="${trackingUrl}" width="1" height="1" style="display:none;" alt="" />`;
+
+    // Convert newlines to BR and append pixel
+    const htmlBody = emailBody.replace(/\n/g, "<br>") + trackingPixel;
 
     // Send email via SMTP
     const client = new SMTPClient({
@@ -120,33 +143,37 @@ serve(async (req: Request) => {
       },
     });
 
-    await client.send({
-      from: `${smtpSettings.from_name} <${smtpSettings.from_email}>`,
-      to: toEmail,
-      subject: emailSubject,
-      content: emailBody,
-      html: emailBody.replace(/\n/g, "<br>"),
-    });
+    try {
+      await client.send({
+        from: `${smtpSettings.from_name} <${smtpSettings.from_email}>`,
+        to: toEmail,
+        subject: emailSubject,
+        content: emailBody, // Plain text version
+        html: htmlBody, // HTML version with pixel
+      });
 
-    await client.close();
+      await client.close();
 
-    // Log the email
-    await supabase.from("email_logs").insert({
-      user_id: userId,
-      lead_id: leadId,
-      to_email: toEmail,
-      subject: emailSubject,
-      body: emailBody,
-      status: "sent",
-      sent_at: new Date().toISOString(),
-    });
+      // 3. Update log to 'sent'
+      await supabase.from("email_logs").update({
+        status: "sent"
+      }).eq("id", logEntry.id);
 
-    // Update lead status
-    if (lead) {
-      await supabase
-        .from("leads")
-        .update({ status: "sent" })
-        .eq("id", leadId);
+      // Update lead status
+      if (lead) {
+        await supabase
+          .from("leads")
+          .update({ status: "Intro Sent" })
+          .eq("id", leadId);
+      }
+    } catch (sendError) {
+      // Update log to 'failed'
+      await supabase.from("email_logs").update({
+        status: "failed",
+        error_message: (sendError as any).message
+      }).eq("id", logEntry.id);
+
+      throw sendError;
     }
 
     return new Response(

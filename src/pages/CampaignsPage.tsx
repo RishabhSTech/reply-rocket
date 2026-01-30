@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Mail, Play, Pause, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -31,6 +33,7 @@ interface Campaign {
   sent: number;
   opened: number;
   replied: number;
+  prompt_json?: any;
 }
 
 const CampaignsPage = () => {
@@ -38,6 +41,7 @@ const CampaignsPage = () => {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [newCampaignName, setNewCampaignName] = useState("");
+  const [promptJson, setPromptJson] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const navigate = useNavigate();
 
@@ -85,6 +89,7 @@ const CampaignsPage = () => {
             sent: emails?.filter((e) => e.status === "sent").length || 0,
             opened: emails?.filter((e) => e.opened_at).length || 0,
             replied: campaignReplies,
+            prompt_json: (campaign as any).prompt_json,
           };
         })
       );
@@ -112,6 +117,21 @@ const CampaignsPage = () => {
       return;
     }
 
+    // Validate JSON if provided
+    let parsedPrompt = {};
+    if (promptJson.trim()) {
+      try {
+        parsedPrompt = JSON.parse(promptJson);
+      } catch (e) {
+        toast({
+          title: "Invalid JSON",
+          description: "Please check your prompt JSON format",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
@@ -120,6 +140,7 @@ const CampaignsPage = () => {
         name: newCampaignName.trim(),
         user_id: user.id,
         status: "active",
+        prompt_json: promptJson.trim() ? parsedPrompt : null,
       });
 
       if (error) throw error;
@@ -130,13 +151,14 @@ const CampaignsPage = () => {
       });
 
       setNewCampaignName("");
+      setPromptJson("");
       setDialogOpen(false);
       loadCampaigns();
     } catch (error) {
       console.error("Error creating campaign:", error);
       toast({
         title: "Error",
-        description: "Failed to create campaign",
+        description: "Failed to create campaign. Make sure database has prompt_json column.",
         variant: "destructive",
       });
     }
@@ -227,12 +249,30 @@ const CampaignsPage = () => {
                   <DialogTitle>Create New Campaign</DialogTitle>
                 </DialogHeader>
                 <div className="space-y-4 pt-4">
-                  <Input
-                    placeholder="Campaign name"
-                    value={newCampaignName}
-                    onChange={(e) => setNewCampaignName(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && createCampaign()}
-                  />
+                  <div className="space-y-2">
+                    <Label htmlFor="campaign-name">Campaign Name</Label>
+                    <Input
+                      id="campaign-name"
+                      placeholder="e.g. Q1 Outreach"
+                      value={newCampaignName}
+                      onChange={(e) => setNewCampaignName(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="campaign-prompt">Campaign Prompt Context (JSON)</Label>
+                    <Textarea
+                      id="campaign-prompt"
+                      placeholder="{\n  'context': 'Specific context for this campaign...'\n}"
+                      className="font-mono text-sm min-h-[100px]"
+                      value={promptJson}
+                      onChange={(e) => setPromptJson(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Optional: Add specific context override for this campaign
+                    </p>
+                  </div>
+
                   <div className="flex justify-end gap-2">
                     <Button
                       variant="outline"

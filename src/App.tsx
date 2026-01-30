@@ -8,6 +8,7 @@ import Auth from "./pages/Auth";
 import LeadsPage from "./pages/LeadsPage";
 import SettingsPage from "./pages/SettingsPage";
 import CampaignsPage from "./pages/CampaignsPage";
+import CampaignDetailsPage from "./pages/CampaignDetailsPage";
 import ComposePage from "./pages/ComposePage";
 import InboxPage from "./pages/InboxPage";
 import MeetingsPage from "./pages/MeetingsPage";
@@ -28,6 +29,7 @@ const App = () => (
           <Route path="/leads" element={<LeadsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/campaigns" element={<CampaignsPage />} />
+          <Route path="/campaigns/:id" element={<CampaignDetailsPage />} />
           <Route path="/compose" element={<ComposePage />} />
           <Route path="/inbox" element={<InboxPage />} />
           <Route path="/meetings" element={<MeetingsPage />} />

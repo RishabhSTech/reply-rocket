@@ -24,6 +24,11 @@ export interface PromptContext {
         keyBenefits?: string;
     };
     tone: ToneType;
+    previousEmails?: {
+        subject: string;
+        body: string;
+        sentAt: string;
+    }[];
 }
 
 export interface GeneratedEmail {
@@ -93,6 +98,15 @@ ${context.leadCompany ? `- Company: ${context.leadCompany}` : ''}
 - Context: ${context.leadRequirement}
 ${context.leadLinkedIn ? `- LinkedIn: ${context.leadLinkedIn}` : ''}
 ${context.leadWebsite ? `- Website: ${context.leadWebsite}` : ''}
+
+HISTORY (Previous emails sent):
+${context.previousEmails?.map((e, i) => `
+Email ${i + 1} (${e.sentAt}):
+Subject: ${e.subject}
+Body: ${e.body}
+`).join('\n') || 'None'}
+
+User has NOT replied to the above emails. This is a follow-up.
 
 Requirements: Max ${emailTemplates.templates.cold_email_writer.structure.body.max_words} words, no fluff, curiosity-driven CTA.`;
 }

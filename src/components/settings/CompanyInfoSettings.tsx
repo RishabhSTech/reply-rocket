@@ -23,13 +23,10 @@ interface UploadedDoc {
 }
 
 export function CompanyInfoSettings() {
-  const [companyInfo, setCompanyInfo] = useState<CompanyInfo>({
-    company_name: "",
-    description: "",
-    value_proposition: "",
-    target_audience: "",
-    key_benefits: "",
-  });
+  const [jsonInput, setJsonInput] = useState("");
+  const [companyId, setCompanyId] = useState<string | undefined>(undefined);
+  const [jsonError, setJsonError] = useState<string | null>(null);
+
   const [uploadedDocs, setUploadedDocs] = useState<UploadedDoc[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -55,14 +52,25 @@ export function CompanyInfoSettings() {
       if (error) throw error;
 
       if (data) {
-        setCompanyInfo({
-          id: data.id,
+        setCompanyId(data.id);
+        const infoObj = {
           company_name: data.company_name || "",
           description: data.description || "",
           value_proposition: data.value_proposition || "",
           target_audience: data.target_audience || "",
           key_benefits: data.key_benefits || "",
-        });
+        };
+        setJsonInput(JSON.stringify(infoObj, null, 2));
+      } else {
+        // Default template
+        const defaultTemplate = {
+          company_name: "",
+          description: "",
+          value_proposition: "",
+          target_audience: "",
+          key_benefits: ""
+        };
+        setJsonInput(JSON.stringify(defaultTemplate, null, 2));
       }
     } catch (error) {
       console.error("Error loading company info:", error);
@@ -93,23 +101,40 @@ export function CompanyInfoSettings() {
     }
   };
 
+  const handleJsonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setJsonInput(e.target.value);
+    setJsonError(null);
+  };
+
   const handleSave = async () => {
     setIsSaving(true);
+    setJsonError(null);
+
     try {
+      // Validate JSON
+      let parsedInfo;
+      try {
+        parsedInfo = JSON.parse(jsonInput);
+      } catch (e) {
+        setJsonError("Invalid JSON format. Please check your syntax.");
+        setIsSaving(false);
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      if (companyInfo.id) {
+      if (companyId) {
         const { error } = await supabase
           .from("company_info")
           .update({
-            company_name: companyInfo.company_name,
-            description: companyInfo.description,
-            value_proposition: companyInfo.value_proposition,
-            target_audience: companyInfo.target_audience,
-            key_benefits: companyInfo.key_benefits,
+            company_name: parsedInfo.company_name,
+            description: parsedInfo.description,
+            value_proposition: parsedInfo.value_proposition,
+            target_audience: parsedInfo.target_audience,
+            key_benefits: parsedInfo.key_benefits,
           })
-          .eq("id", companyInfo.id);
+          .eq("id", companyId);
 
         if (error) throw error;
       } else {
@@ -117,17 +142,17 @@ export function CompanyInfoSettings() {
           .from("company_info")
           .insert({
             user_id: user.id,
-            company_name: companyInfo.company_name,
-            description: companyInfo.description,
-            value_proposition: companyInfo.value_proposition,
-            target_audience: companyInfo.target_audience,
-            key_benefits: companyInfo.key_benefits,
+            company_name: parsedInfo.company_name,
+            description: parsedInfo.description,
+            value_proposition: parsedInfo.value_proposition,
+            target_audience: parsedInfo.target_audience,
+            key_benefits: parsedInfo.key_benefits,
           })
           .select()
           .single();
 
         if (error) throw error;
-        setCompanyInfo(prev => ({ ...prev, id: data.id }));
+        setCompanyId(data.id);
       }
 
       toast({
@@ -221,65 +246,48 @@ export function CompanyInfoSettings() {
             <Building2 className="h-5 w-5 text-primary" />
           </div>
           <div>
-            <CardTitle>Company Information</CardTitle>
+            <CardTitle>Company Information (JSON)</CardTitle>
             <CardDescription>
-              This context helps AI generate personalized emails about your business
+              Edit your company context as JSON. This structure is used by AI to personalize emails.
             </CardDescription>
           </div>
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="space-y-2">
-          <Label htmlFor="company-name">Company Name</Label>
-          <Input
-            id="company-name"
-            value={companyInfo.company_name}
-            onChange={(e) => setCompanyInfo(prev => ({ ...prev, company_name: e.target.value }))}
-            placeholder="Your company name"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="description">What We Do</Label>
+          <div className="flex justify-between items-center">
+            <Label htmlFor="json-editor">JSON Context</Label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                try {
+                  const parsed = JSON.parse(jsonInput);
+                  setJsonInput(JSON.stringify(parsed, null, 2));
+                  setJsonError(null);
+                } catch (e) {
+                  setJsonError("Cannot format invalid JSON");
+                }
+              }}
+              className="h-7 text-xs"
+            >
+              Format JSON
+            </Button>
+          </div>
           <Textarea
-            id="description"
-            value={companyInfo.description}
-            onChange={(e) => setCompanyInfo(prev => ({ ...prev, description: e.target.value }))}
-            placeholder="Briefly describe what your company does..."
-            className="min-h-[80px]"
+            id="json-editor"
+            value={jsonInput}
+            onChange={handleJsonChange}
+            placeholder="{\n  'company_name': '...'\n}"
+            className="min-h-[300px] font-mono text-sm leading-relaxed"
+            spellCheck={false}
           />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="value-prop">Value Proposition</Label>
-          <Textarea
-            id="value-prop"
-            value={companyInfo.value_proposition}
-            onChange={(e) => setCompanyInfo(prev => ({ ...prev, value_proposition: e.target.value }))}
-            placeholder="What unique value do you provide to customers?"
-            className="min-h-[80px]"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="target">Target Audience</Label>
-          <Input
-            id="target"
-            value={companyInfo.target_audience}
-            onChange={(e) => setCompanyInfo(prev => ({ ...prev, target_audience: e.target.value }))}
-            placeholder="e.g., B2B SaaS companies, Series A-C startups"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="benefits">Key Benefits</Label>
-          <Textarea
-            id="benefits"
-            value={companyInfo.key_benefits}
-            onChange={(e) => setCompanyInfo(prev => ({ ...prev, key_benefits: e.target.value }))}
-            placeholder="List 2-3 key benefits (e.g., 3x more meetings, 50% faster ramp-up)"
-            className="min-h-[60px]"
-          />
+          {jsonError && (
+            <p className="text-sm text-destructive font-medium">{jsonError}</p>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Keys required: company_name, description, value_proposition, target_audience, key_benefits
+          </p>
         </div>
 
         <div className="pt-4 border-t space-y-4">

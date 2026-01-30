@@ -99,33 +99,21 @@ export function EmailComposer({ className }: EmailComposerProps) {
       // Get selected AI provider from settings
       const provider = localStorage.getItem('ai_provider') || 'lovable';
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-email`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({
-            leadName: selectedLead.name,
-            leadPosition: selectedLead.position,
-            leadRequirement: selectedLead.requirement,
-            leadLinkedIn: selectedLead.founder_linkedin,
-            leadWebsite: selectedLead.website_url,
-            tone,
-            companyInfo: companyInfo || {},
-            provider, // Include selected AI provider
-          }),
-        }
-      );
+      const { data, error } = await supabase.functions.invoke('generate-email', {
+        body: {
+          leadName: selectedLead.name,
+          leadPosition: selectedLead.position,
+          leadRequirement: selectedLead.requirement,
+          leadLinkedIn: selectedLead.founder_linkedin,
+          leadWebsite: selectedLead.website_url,
+          tone,
+          companyInfo: companyInfo || {},
+          provider, // Include selected AI provider
+        },
+      });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to generate email");
-      }
+      if (error) throw error;
 
-      const data = await response.json();
       setSubject(data.subject || "");
       setBody(data.body || "");
 
@@ -170,30 +158,21 @@ export function EmailComposer({ className }: EmailComposerProps) {
       if (!user) throw new Error("Not authenticated");
 
       // Replace placeholder with actual name
+      // Note: We don't perform replacement here if the body is already personalized
+      // But just in case user added it back
       const personalizedBody = body.replace(/\{\{name\}\}/gi, selectedLead.name.split(" ")[0]);
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-email`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({
-            to: selectedLead.email,
-            subject,
-            body: personalizedBody,
-            leadId: selectedLead.id,
-            userId: user.id,
-          }),
-        }
-      );
+      const { error } = await supabase.functions.invoke('send-email', {
+        body: {
+          to: selectedLead.email,
+          subject,
+          body: personalizedBody,
+          leadId: selectedLead.id,
+          userId: user.id, // Optional, function can deduce from auth context but good to pass if needed
+        },
+      });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to send email");
-      }
+      if (error) throw error;
 
       toast({
         title: "Email sent",
