@@ -5,6 +5,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { SmtpSettings } from "@/components/settings/SmtpSettings";
 import { WarmupSettings } from "@/components/settings/WarmupSettings";
+import { CompanyInfoSettings } from "@/components/settings/CompanyInfoSettings";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { toast } from "sonner";
@@ -44,6 +45,7 @@ const SettingsPage = () => {
         
         <main className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-6 max-w-3xl">
+            <CompanyInfoSettings />
             <SmtpSettings />
             <WarmupSettings />
             

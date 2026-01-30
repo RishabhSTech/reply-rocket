@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      company_info: {
+        Row: {
+          company_name: string | null
+          created_at: string
+          description: string | null
+          id: string
+          key_benefits: string | null
+          target_audience: string | null
+          updated_at: string
+          user_id: string
+          value_proposition: string | null
+        }
+        Insert: {
+          company_name?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          key_benefits?: string | null
+          target_audience?: string | null
+          updated_at?: string
+          user_id: string
+          value_proposition?: string | null
+        }
+        Update: {
+          company_name?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          key_benefits?: string | null
+          target_audience?: string | null
+          updated_at?: string
+          user_id?: string
+          value_proposition?: string | null
+        }
+        Relationships: []
+      }
       email_logs: {
         Row: {
           body: string
@@ -57,6 +93,69 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_replies: {
+        Row: {
+          body: string
+          created_at: string
+          from_email: string
+          from_name: string | null
+          id: string
+          is_read: boolean
+          is_starred: boolean
+          lead_id: string | null
+          original_email_id: string | null
+          received_at: string
+          sentiment: string | null
+          subject: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          from_email: string
+          from_name?: string | null
+          id?: string
+          is_read?: boolean
+          is_starred?: boolean
+          lead_id?: string | null
+          original_email_id?: string | null
+          received_at?: string
+          sentiment?: string | null
+          subject: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          from_email?: string
+          from_name?: string | null
+          id?: string
+          is_read?: boolean
+          is_starred?: boolean
+          lead_id?: string | null
+          original_email_id?: string | null
+          received_at?: string
+          sentiment?: string | null
+          subject?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_replies_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_replies_original_email_id_fkey"
+            columns: ["original_email_id"]
+            isOneToOne: false
+            referencedRelation: "email_logs"
             referencedColumns: ["id"]
           },
         ]

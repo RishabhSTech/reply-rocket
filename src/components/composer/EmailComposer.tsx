@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,7 +12,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Sparkles, Copy, RefreshCw, Send, Wand2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { Sparkles, Copy, RefreshCw, Send, Wand2, Users, Loader2 } from "lucide-react";
+
+interface Lead {
+  id: string;
+  name: string;
+  position: string;
+  requirement: string;
+  email: string | null;
+  founder_linkedin: string | null;
+  website_url: string | null;
+}
+
+interface CompanyInfo {
+  company_name: string | null;
+  description: string | null;
+  value_proposition: string | null;
+  target_audience: string | null;
+  key_benefits: string | null;
+}
 
 interface EmailComposerProps {
   className?: string;
@@ -19,25 +39,177 @@ interface EmailComposerProps {
 
 export function EmailComposer({ className }: EmailComposerProps) {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [tone, setTone] = useState("professional");
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [selectedLeadId, setSelectedLeadId] = useState<string>("");
+  const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
+  const { toast } = useToast();
 
-  const handleGenerate = () => {
+  useEffect(() => {
+    loadLeads();
+    loadCompanyInfo();
+  }, []);
+
+  const loadLeads = async () => {
+    const { data, error } = await supabase
+      .from("leads")
+      .select("id, name, position, requirement, email, founder_linkedin, website_url")
+      .order("created_at", { ascending: false });
+
+    if (!error && data) {
+      setLeads(data);
+    }
+  };
+
+  const loadCompanyInfo = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data } = await supabase
+      .from("company_info")
+      .select("company_name, description, value_proposition, target_audience, key_benefits")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (data) {
+      setCompanyInfo(data);
+    }
+  };
+
+  const selectedLead = leads.find(l => l.id === selectedLeadId);
+
+  const handleGenerate = async () => {
+    if (!selectedLead) {
+      toast({
+        title: "Select a lead",
+        description: "Please select a lead to generate a personalized email",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsGenerating(true);
-    // Simulate AI generation
-    setTimeout(() => {
-      setSubject("Quick question about scaling your outbound");
-      setBody(
-        `Hi {{name}},
+    setSubject("");
+    setBody("");
 
-Noticed {{company}} just raised Series B—congrats. Scaling sales teams post-funding usually means one thing: more outbound, same headcount.
-
-We help growth-stage teams 3x their qualified meetings without hiring more SDRs. Curious if that's on your radar?
-
-Worth a 15-min chat?`
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-email`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            leadName: selectedLead.name,
+            leadPosition: selectedLead.position,
+            leadRequirement: selectedLead.requirement,
+            leadLinkedIn: selectedLead.founder_linkedin,
+            leadWebsite: selectedLead.website_url,
+            tone,
+            companyInfo: companyInfo || {},
+          }),
+        }
       );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to generate email");
+      }
+
+      const data = await response.json();
+      setSubject(data.subject || "");
+      setBody(data.body || "");
+
+      toast({
+        title: "Email generated",
+        description: "Review and edit before sending",
+      });
+    } catch (error) {
+      console.error("Generation error:", error);
+      toast({
+        title: "Generation failed",
+        description: error instanceof Error ? error.message : "Failed to generate email",
+        variant: "destructive",
+      });
+    } finally {
       setIsGenerating(false);
-    }, 1500);
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (!selectedLead?.email) {
+      toast({
+        title: "No email address",
+        description: "This lead doesn't have an email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!subject || !body) {
+      toast({
+        title: "Missing content",
+        description: "Please generate or write an email first",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      // Replace placeholder with actual name
+      const personalizedBody = body.replace(/\{\{name\}\}/gi, selectedLead.name.split(" ")[0]);
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-email`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            to: selectedLead.email,
+            subject,
+            body: personalizedBody,
+            leadId: selectedLead.id,
+            userId: user.id,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to send email");
+      }
+
+      toast({
+        title: "Email sent",
+        description: `Email sent to ${selectedLead.email}`,
+      });
+
+      // Clear the form
+      setSubject("");
+      setBody("");
+      setSelectedLeadId("");
+    } catch (error) {
+      console.error("Send error:", error);
+      toast({
+        title: "Send failed",
+        description: error instanceof Error ? error.message : "Failed to send email",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return (
@@ -62,69 +234,77 @@ Worth a 15-min chat?`
       </div>
 
       <div className="p-5 space-y-5">
-        {/* Lead Context */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="lead-name">Lead Name</Label>
-            <Input
-              id="lead-name"
-              placeholder="e.g., Sarah Chen"
-              className="bg-secondary border-0"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="company">Company</Label>
-            <Input
-              id="company"
-              placeholder="e.g., TechCorp"
-              className="bg-secondary border-0"
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="role">Role</Label>
-            <Input
-              id="role"
-              placeholder="e.g., VP of Sales"
-              className="bg-secondary border-0"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="tone">Tone</Label>
-            <Select defaultValue="professional">
-              <SelectTrigger className="bg-secondary border-0">
-                <SelectValue placeholder="Select tone" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="professional">Professional</SelectItem>
-                <SelectItem value="casual">Casual</SelectItem>
-                <SelectItem value="friendly">Friendly</SelectItem>
-                <SelectItem value="direct">Direct</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
+        {/* Lead Selection */}
         <div className="space-y-2">
-          <Label htmlFor="pain-point">Pain Point / Context</Label>
-          <Textarea
-            id="pain-point"
-            placeholder="e.g., Recently raised Series B, scaling sales team..."
-            className="bg-secondary border-0 min-h-[80px] resize-none"
-          />
+          <Label htmlFor="lead-select">Select Lead</Label>
+          <Select value={selectedLeadId} onValueChange={setSelectedLeadId}>
+            <SelectTrigger className="bg-secondary border-0">
+              <SelectValue placeholder="Choose a lead to personalize for" />
+            </SelectTrigger>
+            <SelectContent>
+              {leads.length === 0 ? (
+                <SelectItem value="none" disabled>
+                  No leads available
+                </SelectItem>
+              ) : (
+                leads.map((lead) => (
+                  <SelectItem key={lead.id} value={lead.id}>
+                    <div className="flex items-center gap-2">
+                      <Users className="w-4 h-4" />
+                      <span>{lead.name}</span>
+                      <span className="text-muted-foreground">- {lead.position}</span>
+                    </div>
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
         </div>
+
+        {selectedLead && (
+          <div className="p-3 rounded-lg bg-muted/50 text-sm space-y-1">
+            <p><span className="text-muted-foreground">Position:</span> {selectedLead.position}</p>
+            <p><span className="text-muted-foreground">Context:</span> {selectedLead.requirement}</p>
+            {selectedLead.email && (
+              <p><span className="text-muted-foreground">Email:</span> {selectedLead.email}</p>
+            )}
+          </div>
+        )}
+
+        {/* Tone Selection */}
+        <div className="space-y-2">
+          <Label htmlFor="tone">Tone</Label>
+          <Select value={tone} onValueChange={setTone}>
+            <SelectTrigger className="bg-secondary border-0">
+              <SelectValue placeholder="Select tone" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="professional">Professional</SelectItem>
+              <SelectItem value="casual">Casual</SelectItem>
+              <SelectItem value="friendly">Friendly</SelectItem>
+              <SelectItem value="direct">Direct</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Company Info Status */}
+        {!companyInfo?.company_name && (
+          <div className="p-3 rounded-lg bg-warning/10 border border-warning/20 text-sm">
+            <p className="text-warning-foreground">
+              💡 Add your company info in Settings for better personalization
+            </p>
+          </div>
+        )}
 
         {/* Generate Button */}
         <Button
           onClick={handleGenerate}
-          disabled={isGenerating}
+          disabled={isGenerating || !selectedLeadId}
           className="w-full gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
         >
           {isGenerating ? (
             <>
-              <RefreshCw className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin" />
               Generating...
             </>
           ) : (
@@ -145,7 +325,10 @@ Worth a 15-min chat?`
                   variant="ghost"
                   size="sm"
                   className="h-7 text-xs gap-1.5"
-                  onClick={() => navigator.clipboard.writeText(subject)}
+                  onClick={() => {
+                    navigator.clipboard.writeText(subject);
+                    toast({ title: "Copied", description: "Subject copied to clipboard" });
+                  }}
                 >
                   <Copy className="w-3 h-3" />
                   Copy
@@ -166,7 +349,10 @@ Worth a 15-min chat?`
                   variant="ghost"
                   size="sm"
                   className="h-7 text-xs gap-1.5"
-                  onClick={() => navigator.clipboard.writeText(body)}
+                  onClick={() => {
+                    navigator.clipboard.writeText(body);
+                    toast({ title: "Copied", description: "Body copied to clipboard" });
+                  }}
                 >
                   <Copy className="w-3 h-3" />
                   Copy
@@ -185,13 +371,22 @@ Worth a 15-min chat?`
                 variant="outline"
                 className="flex-1 gap-2"
                 onClick={handleGenerate}
+                disabled={isGenerating}
               >
-                <RefreshCw className="w-4 h-4" />
+                <RefreshCw className={cn("w-4 h-4", isGenerating && "animate-spin")} />
                 Regenerate
               </Button>
-              <Button className="flex-1 gap-2">
-                <Send className="w-4 h-4" />
-                Add to Campaign
+              <Button 
+                className="flex-1 gap-2"
+                onClick={handleSendEmail}
+                disabled={isSending || !selectedLead?.email}
+              >
+                {isSending ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+                Send Email
               </Button>
             </div>
           </div>
