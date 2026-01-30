@@ -150,10 +150,18 @@ export function EmailComposer({ className }: EmailComposerProps) {
 
       setSubject(data.subject || "");
 
-      // Append signature
-      const user = (await supabase.auth.getUser()).data.user;
-      const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || "Founder";
-      const signature = `\n\nLooking forward to hearing from you\n${userName}`;
+      // Append signature using SMTP from_name setting
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data: smtpSettings } = await supabase
+        .from("smtp_settings")
+        .select("from_name")
+        .eq("user_id", user.id)
+        .single();
+
+      const senderName = smtpSettings?.from_name || user?.user_metadata?.full_name || user?.user_metadata?.name || "Founder";
+      const signature = `\n\nLooking forward to hearing from you\n${senderName}`;
 
       setBody((data.body || "") + signature);
 
