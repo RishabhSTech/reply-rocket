@@ -22,6 +22,7 @@ interface GenerateEmailRequest {
   };
   contextJson?: any;
   provider?: 'claude' | 'openai' | 'lovable';
+  providerApiKey?: string;
   campaignContext?: any;
 }
 
@@ -64,28 +65,14 @@ const emailTemplates = {
  */
 function buildSystemPrompt(companyInfo?: GenerateEmailRequest['companyInfo'], contextJson?: any, campaignContext?: any): string {
   // If rich context_json is provided (from the new settings), use that as the primary source of truth
-  let deepContextInstructions = '';
+  /*
+   * LOGIC UPDATE:
+   * We now ALWAYS include the core "Elite AI SDR" persona to ensure high-quality baseline writing.
+   * If `contextJson` is provided, we append it as a strict framework that overrides specific rules where they conflict,
+   * but broadly we want the "intelligence" of the Elite SDR combined with the "knowledge" of the contextJson.
+   */
 
-  if (contextJson) {
-    // Extract the framework from context_json
-    const contextString = typeof contextJson === 'string'
-      ? contextJson
-      : JSON.stringify(contextJson, null, 2);
-
-    deepContextInstructions = `\n\nCMO BOT FRAMEWORK (Adhere strictly):
-${contextString}
-
-CRITICAL REMINDERS:
-1. Follow ALL tone_rules: no hype, no emojis, no em dashes, no bullet points
-2. Follow cold_email_framework mandatory structure
-3. Use forbidden_language list - NEVER use these words
-4. Respect subject_line_rules and cta_rules
-5. Apply assumption_safety_rules for all inferences
-6. DO NOT add signature or closing - system handles that
-`;
-  }
-
-  const corePrinciples = !deepContextInstructions ? `You are an elite AI SDR writing personalized cold emails based on genuine research.
+  const corePrinciples = `You are an elite AI SDR writing personalized cold emails based on genuine research.
 
 YOUR CORE APPROACH:
 - Write as if you spent 10+ minutes researching the recipient
@@ -94,45 +81,44 @@ YOUR CORE APPROACH:
 - Every detail must come from their actual role, company, or visible projects
 - Build credibility through specificity, not flattery
 
-WRITING RULES:
+WRITING RULES (Unless overridden by Context Framework):
 - Max 90 words
 - Subject line: max 50 chars
 - One specific observation that proves you researched them
 - Clear connection between their situation and what you offer
 - Soft, confident CTA that assumes relevance
-- DO NOT INCLUDE A CLOSING SALUTATION OR SIGNATURE (e.g. "Best,", "Thanks,", "[Name]", "Looking forward", "Regards"). Return ONLY the body paragraphs.
-- If you accidentally included "Best," or a signature, REMOVE IT before returning.
-- End your response with the CTA question or statement, nothing after that.
+- DO NOT INCLUDE A CLOSING SALUTATION OR SIGNATURE. Return ONLY the body paragraphs.
+- End your response with the CTA question or statement.
 
 FORBIDDEN - NEVER USE:
 - "I noticed you're hiring" (too generic)
 - "We help companies like yours" (vague)
 - "Happy to chat" (desperate)
 - "Let me know if interested" (weak)
-- Exclamation marks, emojis, hype language, or em dashes (—)
-- Agency speak: "synergy", "leverage", "innovative", "cutting-edge", "disruptive", "game-changing"
-- Double hyphens (--) or em dashes (—) - use single hyphens (-) only
+- Exclamation marks, emojis, hype language (synergy, revolutionary, etc.)
+`;
 
-CTA EXAMPLES THAT WORK:
-- "Worth a 15-minute conversation?"
-- "Curious if this approach makes sense for your situation?"
-- "Open to exploring how we've helped similar teams?"
+  let deepContextInstructions = '';
+  if (contextJson) {
+    const contextString = typeof contextJson === 'string'
+      ? contextJson
+      : JSON.stringify(contextJson, null, 2);
 
-RESEARCH SIGNALS:
-- Reference something from their LinkedIn profile (recent hire, post, company move)
-- Mention specific product/feature you saw on their website
-- Connect to their job description or visible goals
-- Show understanding of their industry challenges
-- Demonstrate you know what they're actually working on` : '';
+    deepContextInstructions = `\n\n=== CONTEXT & KNOWLEDGE BASE (STRICTLY ADHERE TO THIS FRAMEWORK) ===
+${contextString}
+
+CRITICAL INSTRUCTION:
+Combine the "Elite SDR" writing style with the specific framework defined above.
+If the framework above defines specific forbidden words, structure, or tone, PREFER THOSE over the general defaults.
+But maintain the "Elite SDR" quality (research-based, non-salesy, peer-to-peer).
+`;
+  }
 
   // Only add legacy company context if NO deep context was provided
+  // Reduced to just Company Name as the detailed fields are no longer available/reliable per user request
   const companyContextStr = (!deepContextInstructions && companyInfo?.companyName)
-    ? `\n\nYOUR COMPANY (Use this for context, don't hard-sell):
-- Name: ${companyInfo.companyName}
-- What we do: ${companyInfo.description || 'Not specified'}
-- Value prop: ${companyInfo.valueProposition || 'Not specified'} (Make this THEIR benefit, not our feature)
-- Target: ${companyInfo.targetAudience || 'Not specified'}
-- How we help: ${companyInfo.keyBenefits || 'Not specified'}`
+    ? `\n\nYOUR COMPANY:
+- Name: ${companyInfo.companyName}`
     : '';
 
   const customInstructions = campaignContext
@@ -201,7 +187,8 @@ REMEMBER: Sound like a peer who did homework, not a salesperson running a script
 async function callAIProvider(
   provider: string,
   systemPrompt: string,
-  userPrompt: string
+  userPrompt: string,
+  providerApiKey?: string
 ): Promise<string> {
   const messages = [
     { role: "system", content: systemPrompt },
@@ -210,17 +197,18 @@ async function callAIProvider(
 
   switch (provider) {
     case 'claude':
-      return callClaude(messages, systemPrompt);
+      return callClaude(messages, systemPrompt, providerApiKey);
     case 'openai':
-      return callOpenAI(messages);
+      return callOpenAI(messages, providerApiKey);
     case 'lovable':
-    default:
       return callLovable(messages);
+    default:
+      throw new Error(`Unsupported provider: ${provider}`);
   }
 }
 
-async function callClaude(messages: any[], systemPrompt: string): Promise<string> {
-  const apiKey = Deno.env.get("CLAUDE_API_KEY");
+async function callClaude(messages: any[], systemPrompt: string, providerApiKey?: string): Promise<string> {
+  const apiKey = providerApiKey || Deno.env.get("CLAUDE_API_KEY");
   if (!apiKey) throw new Error("CLAUDE_API_KEY not configured");
 
   const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -248,8 +236,8 @@ async function callClaude(messages: any[], systemPrompt: string): Promise<string
   return data.content[0].text;
 }
 
-async function callOpenAI(messages: any[]): Promise<string> {
-  const apiKey = Deno.env.get("OPENAI_API_KEY");
+async function callOpenAI(messages: any[], providerApiKey?: string): Promise<string> {
+  const apiKey = providerApiKey || Deno.env.get("OPENAI_API_KEY");
   if (!apiKey) throw new Error("OPENAI_API_KEY not configured");
 
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -259,7 +247,7 @@ async function callOpenAI(messages: any[]): Promise<string> {
       "Authorization": `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       messages,
       temperature: 0.7,
       max_tokens: 1024,
@@ -315,11 +303,11 @@ function parseEmailResponse(content: string): { subject: string; body: string } 
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
-      
+
       console.log("✅ Successfully parsed JSON response:");
       console.log("   - Subject:", parsed.subject?.substring(0, 50));
       console.log("   - Body length:", parsed.body?.length);
-      
+
       return {
         subject: parsed.subject || "Quick question",
         body: parsed.body || content,
@@ -347,6 +335,7 @@ serve(async (req) => {
   try {
     const request: GenerateEmailRequest = await req.json();
     const provider = request.provider || 'openai'; // Default to OpenAI
+    const providerApiKey = request.providerApiKey;
 
     // Log request details
     console.log("📧 Email Generation Request:");
@@ -370,7 +359,7 @@ serve(async (req) => {
     console.log("=====================================\n");
 
     // Call AI provider
-    const content = await callAIProvider(provider, systemPrompt, userPrompt);
+    const content = await callAIProvider(provider, systemPrompt, userPrompt, providerApiKey);
 
     // Parse response
     const emailData = parseEmailResponse(content);

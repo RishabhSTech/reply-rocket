@@ -5,7 +5,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Play, Pause, MoreVertical, Plus, Trash2 } from "lucide-react";
+import { Mail, Play, Pause, MoreVertical, Plus, Trash2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,6 +43,7 @@ const CampaignsPage = () => {
   const [newCampaignName, setNewCampaignName] = useState("");
   const [promptJson, setPromptJson] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [runningCampaignId, setRunningCampaignId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -215,6 +216,62 @@ const CampaignsPage = () => {
     }
   };
 
+  const runCampaignNow = async (campaignId: string) => {
+    setRunningCampaignId(campaignId);
+    try {
+      const provider = localStorage.getItem("ai_provider") || "openai";
+      const providerApiKey =
+        provider === "openai"
+          ? localStorage.getItem("openai_api_key") || undefined
+          : provider === "claude"
+            ? localStorage.getItem("claude_api_key") || undefined
+            : undefined;
+
+      console.log("Running campaign with provider:", provider);
+
+      const { data, error } = await supabase.functions.invoke("send-campaign-emails", {
+        body: {
+          campaignId,
+          provider,
+          providerApiKey,
+        },
+      });
+
+      console.log("Campaign response:", { data, error });
+
+      // Check for invoke-level errors (function not found, auth errors, etc)
+      if (error) {
+        console.error("Campaign invoke error:", error);
+        throw new Error(error.message || "Failed to invoke send-campaign-emails function");
+      }
+
+      // Check for API-level errors in the response
+      if (data?.error) {
+        console.error("Campaign API error:", data.error);
+        throw new Error(data.error);
+      }
+
+      if (data?.success && data?.emailsSent !== undefined) {
+        toast({
+          title: "Success",
+          description: `Sent ${data.emailsSent} emails out of ${data.total} leads`,
+        });
+        loadCampaigns();
+      } else {
+        throw new Error("Unexpected response format from send-campaign-emails");
+      }
+    } catch (error: any) {
+      console.error("Error running campaign:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send campaign emails",
+        variant: "destructive",
+      });
+    } finally {
+      setRunningCampaignId(null);
+    }
+  };
+
   const handleNavigate = (path: string) => {
     setCurrentPath(path);
     navigate(path);
@@ -347,6 +404,7 @@ const CampaignsPage = () => {
                       <Button
                         variant="ghost"
                         size="icon"
+                        disabled={runningCampaignId === campaign.id}
                         onClick={(e) => {
                           e.stopPropagation();
                           toggleCampaignStatus(campaign);
@@ -356,6 +414,28 @@ const CampaignsPage = () => {
                           <Pause className="h-4 w-4" />
                         ) : (
                           <Play className="h-4 w-4" />
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={runningCampaignId === campaign.id}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          runCampaignNow(campaign.id);
+                        }}
+                        className="gap-2"
+                      >
+                        {runningCampaignId === campaign.id ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            Running...
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-4 w-4" />
+                            Run Now
+                          </>
                         )}
                       </Button>
                       <DropdownMenu>
