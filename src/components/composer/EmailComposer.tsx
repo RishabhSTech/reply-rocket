@@ -179,15 +179,23 @@ export function EmailComposer({ className }: EmailComposerProps) {
         .eq("user_id", user.id)
         .maybeSingle();
 
-      console.log("📧 SMTP Settings:", smtpSettings);
-      console.log("❌ SMTP Error:", smtpError);
-
       const senderName = smtpSettings?.from_name || user?.user_metadata?.full_name || user?.user_metadata?.name || "Founder";
-      console.log("✅ Sender Name for signature:", senderName);
       
-      const signature = `\n\nLooking forward to hearing from you\n${senderName}`;
+      // Check if body already has a signature or closing
+      const bodyText = data.body || "";
+      const hasSalutation = /\n(Best|Thanks|Regards|Sincerely|Kind regards|Cheers|Looking forward)[,.\s]/i.test(bodyText);
+      const hasSenderName = bodyText.includes(senderName);
+      
+      // Only add signature if not already present
+      let finalBody = bodyText;
+      if (!hasSalutation && !hasSenderName) {
+        finalBody = bodyText + `\n\nBest,\n${senderName}`;
+      } else if (hasSalutation && !hasSenderName) {
+        // Has salutation but missing name - add name
+        finalBody = bodyText + `\n${senderName}`;
+      }
 
-      setBody((data.body || "") + signature);
+      setBody(finalBody);
 
       toast({
         title: "Email generated",
@@ -409,15 +417,6 @@ export function EmailComposer({ className }: EmailComposerProps) {
           </Select>
         </div>
 
-        {/* Company Info Status */}
-        {!companyInfo?.company_name && (
-          <div className="p-3 rounded-lg bg-warning/10 border border-warning/20 text-sm">
-            <p className="text-warning-foreground">
-              💡 Add your company info in Settings for better personalization
-            </p>
-          </div>
-        )}
-
         {/* Generate Button */}
         <Button
           onClick={handleGenerate}
@@ -475,9 +474,6 @@ export function EmailComposer({ className }: EmailComposerProps) {
                     <span className="text-xs font-semibold text-muted-foreground uppercase">Preview</span>
                     <div className="mt-1 text-sm whitespace-pre-wrap break-words bg-background p-3 rounded border max-h-64 overflow-y-auto">
                       {body.replace(/\{\{name\}\}/gi, selectedLead?.name?.split(" ")[0] || "[First Name]")}
-                      <div className="mt-4 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
-                        ✓ Tracking pixel will be automatically added when sent
-                      </div>
                     </div>
                   </div>
                 </div>

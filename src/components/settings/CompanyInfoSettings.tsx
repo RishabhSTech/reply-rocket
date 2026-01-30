@@ -309,7 +309,7 @@ export function CompanyInfoSettings() {
             <p className="text-sm text-destructive font-medium">{jsonError}</p>
           )}
           <p className="text-xs text-muted-foreground">
-            Keys required: company_name, description, value_proposition, target_audience, key_benefits
+            Minimum required: company_name (optional: additional context for AI personalization)
           </p>
         </div>
 

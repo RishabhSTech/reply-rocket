@@ -98,7 +98,9 @@ WRITING RULES:
 - One specific observation that proves you researched them
 - Clear connection between their situation and what you offer
 - Soft, confident CTA that assumes relevance
-- DO NOT INCLUDE A CLOSING SALUTATION OR SIGNATURE (e.g. "Best,", "Thanks,", "[Name]"). The system will append this automatically. Return ONLY the body paragraphs.
+- DO NOT INCLUDE A CLOSING SALUTATION OR SIGNATURE (e.g. "Best,", "Thanks,", "[Name]", "Looking forward", "Regards"). The system will append this automatically. Return ONLY the body paragraphs.
+- If you accidentally included "Best," or a signature, REMOVE IT before returning.
+- End your response with the CTA question or statement, nothing after that.
 
 FORBIDDEN - NEVER USE:
 - "I noticed you're hiring" (too generic)
@@ -339,29 +341,16 @@ serve(async (req) => {
     console.log("📧 Email Generation Request:");
     console.log("  - Lead:", request.leadName, `(${request.leadPosition})`);
     console.log("  - Provider:", provider);
-    console.log("  - Tone:", request.tone);
-    console.log("  - Has companyInfo:", !!request.companyInfo?.companyName);
-    console.log("  - Has contextJson:", !!request.contextJson);
-    console.log("  - contextJson content:", request.contextJson ? JSON.stringify(request.contextJson).substring(0, 300) : "NONE");
-    console.log("  - Has campaignContext:", !!request.campaignContext);
 
     // Build prompts using refined templates
     const systemPrompt = buildSystemPrompt(request.companyInfo, request.contextJson, request.campaignContext);
     const userPrompt = buildUserPrompt(request);
-
-    console.log("✅ System Prompt includes forbidden patterns check:", systemPrompt.includes("em dashes") ? "YES" : "NO");
-    console.log("✅ System Prompt includes contextJson:", request.contextJson ? "YES" : "NO");
-    console.log("✅ System Prompt snippet:", systemPrompt.substring(0, 150) + "...");
 
     // Call AI provider
     const content = await callAIProvider(provider, systemPrompt, userPrompt);
 
     // Parse response
     const emailData = parseEmailResponse(content);
-    
-    console.log("✅ Email generated successfully:");
-    console.log("  - Subject:", emailData.subject);
-    console.log("  - Body length:", emailData.body.length, "chars");
 
     return new Response(JSON.stringify(emailData), {
       status: 200,

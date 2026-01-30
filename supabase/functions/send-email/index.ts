@@ -144,20 +144,20 @@ serve(async (req: Request) => {
     const emailSubject = subject || `Quick question for ${lead?.name || "you"}`;
     let emailBody = body || generateEmailBody(lead, smtpSettings.from_name);
 
-    // ✅ Ensure proper signature handling
-    // Add signature ONLY if:
-    // 1. Body was provided (from composer)
-    // 2. Body doesn't already contain sender's name at the end
+    // ✅ Ensure proper signature handling - NO DUPLICATES
+    // Check for any salutation (Best, Thanks, Regards, Looking forward, etc)
     const trimmedBody = emailBody.trim();
-    const hasSignature = trimmedBody.endsWith(smtpSettings.from_name) || 
-                        trimmedBody.includes(`Best,\n${smtpSettings.from_name}`);
+    const hasSalutation = /\n(Best|Thanks|Regards|Sincerely|Kind regards|Cheers|Looking forward)[,.\s]/i.test(trimmedBody);
+    const hasSenderName = trimmedBody.includes(smtpSettings.from_name);
     
-    if (body && !hasSignature) {
-      emailBody = emailBody.trim() + `\n\nLooking forward to hearing from you.\n\nBest,\n${smtpSettings.from_name}`;
+    // Only add signature if neither salutation nor sender name present
+    if (body && !hasSalutation && !hasSenderName) {
+      emailBody = trimmedBody + `\n\nBest,\n${smtpSettings.from_name}`;
     }
     
     console.log(`✅ Email body prepared for ${lead?.name || "lead"}:`);
-    console.log(`   - Has signature: ${hasSignature}`);
+    console.log(`   - Has salutation: ${hasSalutation}`);
+    console.log(`   - Has sender name: ${hasSenderName}`);
     console.log(`   - Body length: ${emailBody.length} chars`);
 
     // 1. Insert log first with 'pending' status to get the ID
@@ -202,6 +202,7 @@ serve(async (req: Request) => {
     console.log(`✅ Tracking pixel appended for email_log: ${logEntry.id}`);
     console.log(`📍 Tracking URL: ${trackingUrl}`);
     console.log(`📧 HTML Body includes tracking:`, htmlBody.includes('track-email'));
+    console.log(`📧 HTML Body last 200 chars:`, htmlBody.substring(htmlBody.length - 200));
 
     // Send email via SMTP
     const client = new SMTPClient({
@@ -216,6 +217,8 @@ serve(async (req: Request) => {
       },
     });
 
+    console.log(`📨 About to send email with HTML body length: ${htmlBody.length}`);
+
     try {
       await client.send({
         from: `${smtpSettings.from_name} <${smtpSettings.from_email}>`,
@@ -224,6 +227,8 @@ serve(async (req: Request) => {
         content: emailBody, // Plain text version
         html: htmlBody, // HTML version with pixel
       });
+
+      console.log(`✅ Email sent successfully to ${toEmail}`);
 
       await client.close();
 
