@@ -202,7 +202,7 @@ export function EmailComposer({ className }: EmailComposerProps) {
       // Send email via edge function
       const { data: emailData, error: sendError } = await supabase.functions.invoke('send-email', {
         body: {
-          to: selectedLead.email,
+          toEmail: selectedLead.email,
           subject,
           body: personalizedBody,
           leadId: selectedLead.id,

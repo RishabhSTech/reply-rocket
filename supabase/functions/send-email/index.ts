@@ -13,6 +13,13 @@ interface SendEmailRequest {
   toEmail: string;
   subject?: string;
   body?: string;
+  campaignId?: string; // Optional campaign ID
+}
+
+interface Lead {
+  name: string;
+  position: string;
+  requirement?: string;
 }
 
 serve(async (req: Request) => {
@@ -45,7 +52,7 @@ serve(async (req: Request) => {
     }
 
     const userId = claimsData.claims.sub;
-    const { leadId, toEmail, subject, body }: SendEmailRequest = await req.json();
+    const { leadId, toEmail, subject, body, campaignId }: SendEmailRequest = await req.json();
 
     // Get SMTP settings
     const { data: smtpSettings, error: smtpError } = await supabase
@@ -111,6 +118,7 @@ serve(async (req: Request) => {
     const { data: logEntry, error: logError } = await supabase.from("email_logs").insert({
       user_id: userId,
       lead_id: leadId,
+      campaign_id: campaignId || null, // Capture campaignId
       to_email: toEmail,
       subject: emailSubject,
       body: emailBody, // We store original body without pixel
@@ -170,7 +178,7 @@ serve(async (req: Request) => {
       // Update log to 'failed'
       await supabase.from("email_logs").update({
         status: "failed",
-        error_message: (sendError as any).message
+        error_message: (sendError as Error).message
       }).eq("id", logEntry.id);
 
       throw sendError;
@@ -189,7 +197,7 @@ serve(async (req: Request) => {
   }
 });
 
-function generateEmailBody(lead: any, senderName: string): string {
+function generateEmailBody(lead: Lead | null, senderName: string): string {
   if (!lead) {
     return `Hi,
 

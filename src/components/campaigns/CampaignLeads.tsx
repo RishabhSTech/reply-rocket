@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { CsvImporter } from "./CsvImporter";
 
 interface CampaignLeadsProps {
     campaignId: string;
@@ -67,8 +68,8 @@ export function CampaignLeads({ campaignId }: CampaignLeadsProps) {
         }
     };
 
-    const handleAddLead = () => {
-        toast.info("Use CSV Import or add individual leads from the Leads page");
+    const handleImportComplete = () => {
+        loadLeads();
     };
 
     const handleRemoveLead = async (leadId: string) => {
@@ -101,10 +102,13 @@ export function CampaignLeads({ campaignId }: CampaignLeadsProps) {
                         <CardTitle>Campaign Leads</CardTitle>
                         <CardDescription>Manage leads assigned to this campaign</CardDescription>
                     </div>
-                    <Button onClick={handleAddLead}>
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Leads
-                    </Button>
+                    <div className="flex gap-2">
+                        <CsvImporter campaignId={campaignId} onImportComplete={handleImportComplete} />
+                        <Button>
+                            <Plus className="w-4 h-4 mr-2" />
+                            Add Manually
+                        </Button>
+                    </div>
                 </div>
                 <div className="flex items-center gap-2 mt-4">
                     <div className="relative flex-1">
