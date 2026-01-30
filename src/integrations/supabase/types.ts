@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      campaigns: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       company_info: {
         Row: {
           company_name: string | null
@@ -53,10 +80,13 @@ export type Database = {
       email_logs: {
         Row: {
           body: string
+          campaign_id: string | null
+          clicked_at: string | null
           created_at: string
           error_message: string | null
           id: string
           lead_id: string | null
+          opened_at: string | null
           sent_at: string | null
           status: string
           subject: string
@@ -65,10 +95,13 @@ export type Database = {
         }
         Insert: {
           body: string
+          campaign_id?: string | null
+          clicked_at?: string | null
           created_at?: string
           error_message?: string | null
           id?: string
           lead_id?: string | null
+          opened_at?: string | null
           sent_at?: string | null
           status?: string
           subject: string
@@ -77,10 +110,13 @@ export type Database = {
         }
         Update: {
           body?: string
+          campaign_id?: string | null
+          clicked_at?: string | null
           created_at?: string
           error_message?: string | null
           id?: string
           lead_id?: string | null
+          opened_at?: string | null
           sent_at?: string | null
           status?: string
           subject?: string
@@ -88,6 +124,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "email_logs_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "email_logs_lead_id_fkey"
             columns: ["lead_id"]
@@ -162,6 +205,7 @@ export type Database = {
       }
       leads: {
         Row: {
+          campaign_id: string | null
           created_at: string
           email: string | null
           founder_linkedin: string | null
@@ -175,6 +219,7 @@ export type Database = {
           website_url: string | null
         }
         Insert: {
+          campaign_id?: string | null
           created_at?: string
           email?: string | null
           founder_linkedin?: string | null
@@ -188,6 +233,7 @@ export type Database = {
           website_url?: string | null
         }
         Update: {
+          campaign_id?: string | null
           created_at?: string
           email?: string | null
           founder_linkedin?: string | null
@@ -200,7 +246,68 @@ export type Database = {
           user_id?: string
           website_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "leads_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meetings: {
+        Row: {
+          created_at: string
+          duration_minutes: number
+          id: string
+          lead_id: string | null
+          meeting_link: string | null
+          meeting_type: string
+          notes: string | null
+          scheduled_at: string
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          duration_minutes?: number
+          id?: string
+          lead_id?: string | null
+          meeting_link?: string | null
+          meeting_type?: string
+          notes?: string | null
+          scheduled_at: string
+          status?: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          duration_minutes?: number
+          id?: string
+          lead_id?: string | null
+          meeting_link?: string | null
+          meeting_type?: string
+          notes?: string | null
+          scheduled_at?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meetings_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       smtp_settings: {
         Row: {
