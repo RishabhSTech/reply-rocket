@@ -20,6 +20,7 @@ interface GenerateEmailRequest {
     targetAudience?: string;
     keyBenefits?: string;
   };
+  contextJson?: any;
   provider?: 'claude' | 'openai' | 'lovable';
   campaignContext?: any;
 }
@@ -61,7 +62,27 @@ const emailTemplates = {
 /**
  * Build optimized system prompt with research-based personalization
  */
-function buildSystemPrompt(companyInfo?: GenerateEmailRequest['companyInfo'], campaignContext?: any): string {
+function buildSystemPrompt(companyInfo?: GenerateEmailRequest['companyInfo'], contextJson?: any, campaignContext?: any): string {
+  // If rich context_json is provided (from the new settings), use that as the primary source of truth
+  // and inject it directly into the prompt instructions
+  let deepContextInstructions = '';
+
+  if (contextJson) {
+    // Determine if user provided a specific structure or just a flat object
+    const contextString = typeof contextJson === 'string'
+      ? contextJson
+      : JSON.stringify(contextJson, null, 2);
+
+    deepContextInstructions = `\n\nDETAILED COMPANY STRATEGY & PERSONA (Adhere strictly to this):
+${contextString}
+
+IMPORTANT INSTRUCTION FOR THIS CONTEXT:
+1. Adopt the 'role', 'writing_principles', and 'tone_rules' defined in 'cmo_bot_context' if present.
+2. Use the 'cold_email_framework' logic if present.
+3. IGNORE any 'output_rules' in the JSON that specify adding a signature. The system adds a signature automatically.
+`;
+  }
+
   const corePrinciples = `You are an elite AI SDR writing personalized cold emails based on genuine research.
 
 YOUR CORE APPROACH:
@@ -77,14 +98,17 @@ WRITING RULES:
 - One specific observation that proves you researched them
 - Clear connection between their situation and what you offer
 - Soft, confident CTA that assumes relevance
+- DO NOT INCLUDE A CLOSING SALUTATION OR SIGNATURE (e.g. "Best,", "Thanks,", "[Name]"). The system will append this automatically. Return ONLY the body paragraphs.
 
 FORBIDDEN - NEVER USE:
 - "I noticed you're hiring" (too generic)
 - "We help companies like yours" (vague)
 - "Happy to chat" (desperate)
 - "Let me know if interested" (weak)
-- Exclamation marks, emojis, or hype language
+- Exclamation marks, emojis, hype language, or em dashes (—)
 - Agency speak: "synergy", "leverage", "innovative", "cutting-edge"
+- Double hyphens (--) or em dashes (—) - use single hyphens (-) only
+- "synergy", "leverage", "disruptive", "game-changing", "best in class"
 
 CTA EXAMPLES THAT WORK:
 - "Worth a 15-minute conversation?"
@@ -98,7 +122,8 @@ RESEARCH SIGNALS:
 - Show understanding of their industry challenges
 - Demonstrate you know what they're actually working on`;
 
-  const companyContextStr = companyInfo?.companyName
+  // Only add legacy company context if NO deep context was provided
+  const companyContextStr = (!deepContextInstructions && companyInfo?.companyName)
     ? `\n\nYOUR COMPANY (Use this for context, don't hard-sell):
 - Name: ${companyInfo.companyName}
 - What we do: ${companyInfo.description || 'Not specified'}
@@ -108,11 +133,11 @@ RESEARCH SIGNALS:
     : '';
 
   const customInstructions = campaignContext
-    ? `\n\nCAMPAIGN SPECIFIC INSTRUCTIONS (PRIORITIZE THESE):
+    ? `\n\nCAMPAIGN SPECIFIC INSTRUCTIONS (PRIORITIZE THESE OVER GENERAL CONTEXT):
 ${typeof campaignContext === 'string' ? campaignContext : JSON.stringify(campaignContext, null, 2)}`
     : '';
 
-  return `${corePrinciples}${companyContextStr}${customInstructions}
+  return `${corePrinciples}${deepContextInstructions}${companyContextStr}${customInstructions}
 
 OUTPUT FORMAT (JSON ONLY - NO MARKDOWN):
 {
@@ -310,22 +335,39 @@ serve(async (req) => {
     const request: GenerateEmailRequest = await req.json();
     const provider = request.provider || 'lovable';
 
+    // Log request details for debugging
+    console.log("📧 Email Generation Request:");
+    console.log("  - Lead:", request.leadName, `(${request.leadPosition})`);
+    console.log("  - Provider:", provider);
+    console.log("  - Tone:", request.tone);
+    console.log("  - Has companyInfo:", !!request.companyInfo?.companyName);
+    console.log("  - Has contextJson:", !!request.contextJson);
+    console.log("  - Has campaignContext:", !!request.campaignContext);
+
     // Build prompts using refined templates
-    const systemPrompt = buildSystemPrompt(request.companyInfo, request.campaignContext);
+    const systemPrompt = buildSystemPrompt(request.companyInfo, request.contextJson, request.campaignContext);
     const userPrompt = buildUserPrompt(request);
+
+    console.log("✅ System Prompt includes forbidden patterns check:", systemPrompt.includes("em dashes") ? "YES" : "NO");
+    console.log("✅ System Prompt includes contextJson:", request.contextJson ? "YES" : "NO");
+    console.log("✅ System Prompt snippet:", systemPrompt.substring(0, 150) + "...");
 
     // Call AI provider
     const content = await callAIProvider(provider, systemPrompt, userPrompt);
 
     // Parse response
     const emailData = parseEmailResponse(content);
+    
+    console.log("✅ Email generated successfully:");
+    console.log("  - Subject:", emailData.subject);
+    console.log("  - Body length:", emailData.body.length, "chars");
 
     return new Response(JSON.stringify(emailData), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("generate-email error:", error);
+    console.error("❌ generate-email error:", error);
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       {

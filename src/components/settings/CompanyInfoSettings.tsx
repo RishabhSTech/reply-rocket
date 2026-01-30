@@ -15,6 +15,7 @@ interface CompanyInfo {
   value_proposition: string;
   target_audience: string;
   key_benefits: string;
+  context_json?: any;
 }
 
 interface UploadedDoc {
@@ -53,24 +54,37 @@ export function CompanyInfoSettings() {
 
       if (data) {
         setCompanyId(data.id);
-        const infoObj = {
-          company_name: data.company_name || "",
-          description: data.description || "",
-          value_proposition: data.value_proposition || "",
-          target_audience: data.target_audience || "",
-          key_benefits: data.key_benefits || "",
-        };
-        setJsonInput(JSON.stringify(infoObj, null, 2));
+
+        let displayJson = "";
+
+        // Prioritize context_json if available (supports custom structure)
+        if ((data as any).context_json) {
+          displayJson = JSON.stringify((data as any).context_json, null, 2);
+        } else {
+          // Fallback to legacy fields
+          const infoObj = {
+            company_name: data.company_name || "",
+            description: data.description || "",
+            value_proposition: data.value_proposition || "",
+            target_audience: data.target_audience || "",
+            key_benefits: data.key_benefits || "",
+          };
+          displayJson = JSON.stringify(infoObj, null, 2);
+        }
+
+        setJsonInput(displayJson);
       } else {
         // Default template
         const defaultTemplate = {
-          company_name: "",
-          description: "",
-          value_proposition: "",
-          target_audience: "",
-          key_benefits: ""
+          meta: {
+            company_name: "",
+            description: ""
+          },
+          // ... other structure
         };
-        setJsonInput(JSON.stringify(defaultTemplate, null, 2));
+        // Use the user's requested structure as the new default if they start fresh, 
+        // or just keep the empty object. Let's keep a simple object for now but prepared for their structure.
+        setJsonInput("{\n  \"company_name\": \"\"\n}");
       }
     } catch (error) {
       console.error("Error loading company info:", error);
@@ -124,16 +138,29 @@ export function CompanyInfoSettings() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      // Attempt to extract legacy fields for backward compatibility if they exist in the JSON
+      // Access deeply nested fields if the user is using the new structure
+      const companyName = parsedInfo.company_name || parsedInfo.meta?.company_name || null;
+      const description = parsedInfo.description || parsedInfo.meta?.description || null;
+      // Other fields might not map directly, which is fine.
+
+      const updatePayload = {
+        context_json: parsedInfo, // Save the full JSON blob
+        // Sync legacy columns if possible, but don't overwrite with null if we can avoid it? 
+        // Actually, better to just sync what we can.
+        company_name: companyName,
+        description: description,
+        // For other fields, if they don't exist at root, we might just leave them or set to null.
+        // Let's rely on context_json for the new logic and just populate what we can.
+        value_proposition: parsedInfo.value_proposition || null,
+        target_audience: parsedInfo.target_audience || null,
+        key_benefits: parsedInfo.key_benefits || null,
+      };
+
       if (companyId) {
         const { error } = await supabase
           .from("company_info")
-          .update({
-            company_name: parsedInfo.company_name,
-            description: parsedInfo.description,
-            value_proposition: parsedInfo.value_proposition,
-            target_audience: parsedInfo.target_audience,
-            key_benefits: parsedInfo.key_benefits,
-          })
+          .update(updatePayload)
           .eq("id", companyId);
 
         if (error) throw error;
@@ -142,11 +169,7 @@ export function CompanyInfoSettings() {
           .from("company_info")
           .insert({
             user_id: user.id,
-            company_name: parsedInfo.company_name,
-            description: parsedInfo.description,
-            value_proposition: parsedInfo.value_proposition,
-            target_audience: parsedInfo.target_audience,
-            key_benefits: parsedInfo.key_benefits,
+            ...updatePayload
           })
           .select()
           .single();
@@ -163,7 +186,7 @@ export function CompanyInfoSettings() {
       console.error("Error saving:", error);
       toast({
         title: "Error",
-        description: "Failed to save company information",
+        description: "Failed to save. Make sure you ran the SQL migration to add 'context_json' column.",
         variant: "destructive",
       });
     } finally {

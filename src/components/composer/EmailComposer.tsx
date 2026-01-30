@@ -99,7 +99,7 @@ export function EmailComposer({ className }: EmailComposerProps) {
 
     const { data } = await supabase
       .from("company_info")
-      .select("company_name, description, value_proposition, target_audience, key_benefits")
+      .select("company_name, description, value_proposition, target_audience, key_benefits, context_json")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -140,6 +140,7 @@ export function EmailComposer({ className }: EmailComposerProps) {
           leadWebsite: selectedLead.website_url,
           tone,
           companyInfo: companyInfo || {},
+          contextJson: (companyInfo as any)?.context_json, // Pass rich context if available
           campaignContext: campaigns.find(c => c.id === selectedCampaignId)?.prompt_json,
           provider,
         },
@@ -148,7 +149,13 @@ export function EmailComposer({ className }: EmailComposerProps) {
       if (error) throw error;
 
       setSubject(data.subject || "");
-      setBody(data.body || "");
+
+      // Append signature
+      const user = (await supabase.auth.getUser()).data.user;
+      const userName = user?.user_metadata?.full_name || user?.user_metadata?.name || "Founder";
+      const signature = `\n\nLooking forward to hearing from you\n${userName}`;
+
+      setBody((data.body || "") + signature);
 
       toast({
         title: "Email generated",

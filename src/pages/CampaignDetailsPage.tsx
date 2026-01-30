@@ -13,6 +13,7 @@ import { CampaignOverview } from "@/components/campaigns/CampaignOverview";
 import { CampaignLeads } from "@/components/campaigns/CampaignLeads";
 import { CampaignSettings } from "@/components/campaigns/CampaignSettings";
 import { CampaignInbox } from "@/components/campaigns/CampaignInbox";
+import { ManualSequenceSender } from "@/components/campaigns/ManualSequenceSender";
 
 const CampaignDetailsPage = () => {
     const { id } = useParams<{ id: string }>();
@@ -91,6 +92,12 @@ const CampaignDetailsPage = () => {
                                     Sequence
                                 </TabsTrigger>
                                 <TabsTrigger
+                                    value="manual-send"
+                                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3"
+                                >
+                                    Manual Send
+                                </TabsTrigger>
+                                <TabsTrigger
                                     value="settings"
                                     className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3"
                                 >
@@ -116,6 +123,9 @@ const CampaignDetailsPage = () => {
                                         campaignId={campaign.id}
                                         initialSequence={campaign.sequence || []}
                                     />
+                                </TabsContent>
+                                <TabsContent value="manual-send">
+                                    <ManualSequenceSender />
                                 </TabsContent>
                                 <TabsContent value="inbox">
                                     <CampaignInbox campaignId={campaign.id} />

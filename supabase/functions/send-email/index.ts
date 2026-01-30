@@ -13,13 +13,29 @@ interface SendEmailRequest {
   toEmail: string;
   subject?: string;
   body?: string;
-  campaignId?: string; // Optional campaign ID
+  campaignId?: string;
 }
 
 interface Lead {
   name: string;
   position: string;
   requirement?: string;
+}
+
+// Cache SMTP settings for 5 minutes to reduce database queries
+const settingsCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+function getCachedSettings(userId: string) {
+  const cached = settingsCache.get(userId);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+  return null;
+}
+
+function setCachedSettings(userId: string, data: any) {
+  settingsCache.set(userId, { data, timestamp: Date.now() });
 }
 
 serve(async (req: Request) => {
@@ -54,28 +70,42 @@ serve(async (req: Request) => {
     const userId = claimsData.claims.sub;
     const { leadId, toEmail, subject, body, campaignId }: SendEmailRequest = await req.json();
 
-    // Get SMTP settings
-    const { data: smtpSettings, error: smtpError } = await supabase
-      .from("smtp_settings")
-      .select("*")
-      .eq("user_id", userId)
-      .single();
+    // Get SMTP settings (with cache)
+    let smtpSettings = getCachedSettings(`smtp_${userId}`);
+    if (!smtpSettings) {
+      const { data, error: smtpError } = await supabase
+        .from("smtp_settings")
+        .select("*")
+        .eq("user_id", userId)
+        .single();
 
-    if (smtpError || !smtpSettings) {
-      return new Response(
-        JSON.stringify({ error: "SMTP settings not configured. Please set up your SMTP in Settings." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (smtpError || !data) {
+        return new Response(
+          JSON.stringify({ error: "SMTP settings not configured. Please set up your SMTP in Settings." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      smtpSettings = data;
+      setCachedSettings(`smtp_${userId}`, smtpSettings);
     }
 
-    // Get warmup settings
-    const { data: warmupSettings } = await supabase
-      .from("warmup_settings")
-      .select("*")
-      .eq("user_id", userId)
-      .single();
+    // Get warmup settings (with cache)
+    let warmupSettings = getCachedSettings(`warmup_${userId}`);
+    if (!warmupSettings) {
+      const { data } = await supabase
+        .from("warmup_settings")
+        .select("*")
+        .eq("user_id", userId)
+        .single();
 
-    // Check daily limit if warmup is enabled
+      if (data) {
+        setCachedSettings(`warmup_${userId}`, data);
+        warmupSettings = data;
+      }
+    }
+
+    // Check daily limit and send window (if warmup enabled)
     if (warmupSettings?.enabled) {
       const today = new Date().toISOString().split("T")[0];
       const { count } = await supabase
@@ -87,7 +117,7 @@ serve(async (req: Request) => {
 
       if ((count || 0) >= warmupSettings.current_daily_limit) {
         return new Response(
-          JSON.stringify({ error: `Daily limit of ${warmupSettings.current_daily_limit} emails reached. Limit will increase tomorrow.` }),
+          JSON.stringify({ error: `Daily limit of ${warmupSettings.current_daily_limit} emails reached.` }),
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -114,10 +144,21 @@ serve(async (req: Request) => {
     const emailSubject = subject || `Quick question for ${lead?.name || "you"}`;
     let emailBody = body || generateEmailBody(lead, smtpSettings.from_name);
 
-    // Append signature if sending from Composer (body provided) and it doesn't already have the name
-    if (body && !body.includes(smtpSettings.from_name)) {
-      emailBody += `\n\nLooking forward to hearing from you.\n\nBest,\n${smtpSettings.from_name}`;
+    // ✅ Ensure proper signature handling
+    // Add signature ONLY if:
+    // 1. Body was provided (from composer)
+    // 2. Body doesn't already contain sender's name at the end
+    const trimmedBody = emailBody.trim();
+    const hasSignature = trimmedBody.endsWith(smtpSettings.from_name) || 
+                        trimmedBody.includes(`Best,\n${smtpSettings.from_name}`);
+    
+    if (body && !hasSignature) {
+      emailBody = emailBody.trim() + `\n\nLooking forward to hearing from you.\n\nBest,\n${smtpSettings.from_name}`;
     }
+    
+    console.log(`✅ Email body prepared for ${lead?.name || "lead"}:`);
+    console.log(`   - Has signature: ${hasSignature}`);
+    console.log(`   - Body length: ${emailBody.length} chars`);
 
     // 1. Insert log first with 'pending' status to get the ID
     const { data: logEntry, error: logError } = await supabase.from("email_logs").insert({
@@ -142,10 +183,15 @@ serve(async (req: Request) => {
     trackingUrlObj.searchParams.set("id", logEntry.id);
     const trackingUrl = trackingUrlObj.toString();
 
-    const trackingPixel = `<img src="${trackingUrl}" width="1" height="1" style="display:none;" alt="" />`;
+    // Ensure tracking pixel is properly formed and will be loaded
+    const trackingPixel = `<img src="${trackingUrl}" width="1" height="1" alt="" style="display:none;border:0;" />`;
 
-    // Convert newlines to BR and append pixel
-    const htmlBody = emailBody.replace(/\n/g, "<br>") + trackingPixel;
+    // Convert newlines to BR and append pixel at the end of body
+    // Use <br /> for proper XHTML compliance
+    const htmlBody = emailBody.replace(/\n/g, "<br />") + `<br /><br />${trackingPixel}`;
+    
+    console.log(`✅ Tracking pixel appended for email_log: ${logEntry.id}`);
+    console.log(`📍 Tracking URL: ${trackingUrl}`);
 
     // Send email via SMTP
     const client = new SMTPClient({
