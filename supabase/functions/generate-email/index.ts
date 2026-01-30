@@ -58,62 +58,107 @@ const emailTemplates = {
 };
 
 /**
- * Build optimized system prompt
+ * Build optimized system prompt with research-based personalization
  */
 function buildSystemPrompt(companyInfo?: GenerateEmailRequest['companyInfo']): string {
-  const { cmo_bot_context, cold_email_writer } = emailTemplates;
+  const corePrinciples = `You are an elite AI SDR writing personalized cold emails based on genuine research.
 
-  const corePrinciples = `You are an expert B2B cold email copywriter.
+YOUR CORE APPROACH:
+- Write as if you spent 10+ minutes researching the recipient
+- Reference specific details from their website or LinkedIn that show real attention
+- Sound like a peer who understands their business, not a salesperson
+- Every detail must come from their actual role, company, or visible projects
+- Build credibility through specificity, not flattery
 
 WRITING RULES:
-- Max ${cold_email_writer.body.max_words} words
-- Subject: max ${cold_email_writer.structure.subject_line.max_chars} chars
-- Tone: ${cmo_bot_context.writing_principles.tone}
-- Style: ${cmo_bot_context.writing_principles.style}
+- Max 90 words
+- Subject line: max 50 chars
+- One specific observation that proves you researched them
+- Clear connection between their situation and what you offer
+- Soft, confident CTA that assumes relevance
 
-FORBIDDEN:
-- Words: ${cmo_bot_context.forbidden_words.join(', ')}
-- Never use exclamation marks
-- No corporate buzzwords
+FORBIDDEN - NEVER USE:
+- "I noticed you're hiring" (too generic)
+- "We help companies like yours" (vague)
+- "Happy to chat" (desperate)
+- "Let me know if interested" (weak)
+- Exclamation marks, emojis, or hype language
+- Agency speak: "synergy", "leverage", "innovative", "cutting-edge"
 
-CTA STYLE: ${cold_email_writer.structure.cta.style}
-Examples: ${cold_email_writer.structure.cta.examples.slice(0, 2).join(', ')}`;
+CTA EXAMPLES THAT WORK:
+- "Worth a 15-minute conversation?"
+- "Curious if this approach makes sense for your situation?"
+- "Open to exploring how we've helped similar teams?"
+
+RESEARCH SIGNALS:
+- Reference something from their LinkedIn profile (recent hire, post, company move)
+- Mention specific product/feature you saw on their website
+- Connect to their job description or visible goals
+- Show understanding of their industry challenges
+- Demonstrate you know what they're actually working on`;
 
   const companyContext = companyInfo?.companyName
-    ? `\n\nYOUR COMPANY:
+    ? `\n\nYOUR COMPANY (Use this for context, don't hard-sell):
 - Name: ${companyInfo.companyName}
 - What we do: ${companyInfo.description || 'Not specified'}
-- Value prop: ${companyInfo.valueProposition || 'Not specified'}
+- Value prop: ${companyInfo.valueProposition || 'Not specified'} (Make this THEIR benefit, not our feature)
 - Target: ${companyInfo.targetAudience || 'Not specified'}
-- Benefits: ${companyInfo.keyBenefits || 'Not specified'}`
+- How we help: ${companyInfo.keyBenefits || 'Not specified'}`
     : '';
 
   return `${corePrinciples}${companyContext}
 
-OUTPUT FORMAT (JSON only):
+OUTPUT FORMAT (JSON ONLY - NO MARKDOWN):
 {
-  "subject": "subject line here",
-  "body": "email body with {{name}} placeholder"
+  "subject": "subject line here (shows you researched them)",
+  "body": "email body with {{name}} placeholder for first name only"
 }`;
 }
 
 /**
- * Build user prompt
+ * Build user prompt with research signals and context
  */
 function buildUserPrompt(request: GenerateEmailRequest): string {
   const toneDesc = emailTemplates.tone_variations[request.tone as keyof typeof emailTemplates.tone_variations]?.characteristics || 'professional';
 
-  return `Write a ${request.tone} email (${toneDesc}) for:
+  // Build research context - this is what signals "I did my homework"
+  let researchContext = '';
+  
+  if (request.leadWebsite) {
+    researchContext += `\nVISITED THEIR WEBSITE: ${request.leadWebsite}`;
+  }
+  
+  if (request.leadLinkedIn) {
+    researchContext += `\nVISITED THEIR LINKEDIN: ${request.leadLinkedIn}`;
+  }
 
-LEAD:
-- Name: ${request.leadName}
+  const prompt = `Write a ${request.tone} cold email (${toneDesc}) for someone you genuinely researched.
+
+ABOUT THE RECIPIENT:
+- Name: {{name}} (first name only, use placeholder)
 - Role: ${request.leadPosition}
 ${request.leadCompany ? `- Company: ${request.leadCompany}` : ''}
-- Context: ${request.leadRequirement}
-${request.leadLinkedIn ? `- LinkedIn: ${request.leadLinkedIn}` : ''}
-${request.leadWebsite ? `- Website: ${request.leadWebsite}` : ''}
+- What they're working on: ${request.leadRequirement}
+${researchContext}
 
-Requirements: Max ${emailTemplates.cold_email_writer.body.max_words} words, no fluff, curiosity-driven CTA.`;
+YOUR TASK:
+1. Use research details from their website/LinkedIn to show you actually know them
+2. Reference something specific they're doing (new hire, visible goal, product feature, etc.)
+3. Connect their situation to YOUR value prop (what makes YOUR company relevant to THEIR role)
+4. Be conversational and warm, but respect their time
+5. Make them feel like this wasn't a mass email
+
+REQUIRED:
+- Max 90 words
+- One clear observation that proves you researched
+- One specific problem they likely face in their role
+- One reason YOUR company helps with that problem
+- Soft CTA (not "let me know if interested")
+- Zero hype language
+
+REMEMBER: Sound like a peer who did homework, not a salesperson running a script.`;
+
+  return prompt;
 }
 
 /**

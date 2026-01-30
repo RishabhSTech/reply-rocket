@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Sparkles, Copy, RefreshCw, Send, Wand2, Users, Loader2 } from "lucide-react";
+import { Sparkles, Copy, RefreshCw, Send, Wand2, Users, Loader2, Eye, EyeOff } from "lucide-react";
 
 interface Lead {
   id: string;
@@ -23,6 +24,12 @@ interface Lead {
   email: string | null;
   founder_linkedin: string | null;
   website_url: string | null;
+}
+
+interface Campaign {
+  id: string;
+  name: string;
+  status: string;
 }
 
 interface CompanyInfo {
@@ -44,12 +51,17 @@ export function EmailComposer({ className }: EmailComposerProps) {
   const [body, setBody] = useState("");
   const [tone, setTone] = useState("professional");
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [selectedLeadId, setSelectedLeadId] = useState<string>("");
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>("");
+  const [showPreview, setShowPreview] = useState(false);
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadLeads();
+    loadCampaigns();
     loadCompanyInfo();
   }, []);
 
@@ -61,6 +73,22 @@ export function EmailComposer({ className }: EmailComposerProps) {
 
     if (!error && data) {
       setLeads(data);
+    }
+  };
+
+  const loadCampaigns = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from("campaigns")
+      .select("id, name, status")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .order("created_at", { ascending: false });
+
+    if (!error && data) {
+      setCampaigns(data);
     }
   };
 
@@ -99,16 +127,19 @@ export function EmailComposer({ className }: EmailComposerProps) {
       // Get selected AI provider from settings
       const provider = localStorage.getItem('ai_provider') || 'lovable';
 
+      // Send lead research data for personalized email generation
+      // This includes website and LinkedIn URLs to enable AI to write emails
+      // that sound like they were researched (not generic mass emails)
       const { data, error } = await supabase.functions.invoke('generate-email', {
         body: {
           leadName: selectedLead.name,
           leadPosition: selectedLead.position,
           leadRequirement: selectedLead.requirement,
-          leadLinkedIn: selectedLead.founder_linkedin,
-          leadWebsite: selectedLead.website_url,
+          leadLinkedIn: selectedLead.founder_linkedin, // Used for research-based context
+          leadWebsite: selectedLead.website_url,       // Used for research-based context
           tone,
           companyInfo: companyInfo || {},
-          provider, // Include selected AI provider
+          provider,
         },
       });
 
@@ -152,37 +183,65 @@ export function EmailComposer({ className }: EmailComposerProps) {
       return;
     }
 
+    if (!selectedCampaignId) {
+      toast({
+        title: "Select campaign",
+        description: "Please select a campaign to send this email to",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsSending(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      // Replace placeholder with actual name
-      // Note: We don't perform replacement here if the body is already personalized
-      // But just in case user added it back
       const personalizedBody = body.replace(/\{\{name\}\}/gi, selectedLead.name.split(" ")[0]);
 
-      const { error } = await supabase.functions.invoke('send-email', {
+      // Send email via edge function
+      const { data: emailData, error: sendError } = await supabase.functions.invoke('send-email', {
         body: {
           to: selectedLead.email,
           subject,
           body: personalizedBody,
           leadId: selectedLead.id,
-          userId: user.id, // Optional, function can deduce from auth context but good to pass if needed
+          userId: user.id,
+          campaignId: selectedCampaignId,
+          emailType: "intro", // Label as intro email
         },
       });
 
-      if (error) throw error;
+      if (sendError) throw sendError;
 
       toast({
-        title: "Email sent",
-        description: `Email sent to ${selectedLead.email}`,
+        title: "Email sent successfully",
+        description: `Email sent to ${selectedLead.email}. Redirecting to campaign...`,
       });
 
-      // Clear the form
+      // Log email to database with campaign reference
+      await supabase.from("email_logs").insert({
+        user_id: user.id,
+        lead_id: selectedLead.id,
+        campaign_id: selectedCampaignId,
+        to_email: selectedLead.email,
+        subject,
+        body: personalizedBody,
+        status: "sent",
+        sent_at: new Date().toISOString(),
+      });
+
+      // Clear form
       setSubject("");
       setBody("");
       setSelectedLeadId("");
+      setSelectedCampaignId("");
+      setShowPreview(false);
+
+      // Redirect to campaign details
+      setTimeout(() => {
+        navigate(`/campaigns/${selectedCampaignId}`);
+      }, 1500);
     } catch (error) {
       console.error("Send error:", error);
       toast({
@@ -217,6 +276,29 @@ export function EmailComposer({ className }: EmailComposerProps) {
       </div>
 
       <div className="p-5 space-y-5">
+        {/* Campaign Selection */}
+        <div className="space-y-2">
+          <Label htmlFor="campaign-select">Select Campaign</Label>
+          <Select value={selectedCampaignId} onValueChange={setSelectedCampaignId}>
+            <SelectTrigger className="bg-secondary border-0">
+              <SelectValue placeholder="Choose a campaign to send to" />
+            </SelectTrigger>
+            <SelectContent>
+              {campaigns.length === 0 ? (
+                <SelectItem value="none" disabled>
+                  No active campaigns available
+                </SelectItem>
+              ) : (
+                campaigns.map((campaign) => (
+                  <SelectItem key={campaign.id} value={campaign.id}>
+                    <span>{campaign.name}</span>
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Lead Selection */}
         <div className="space-y-2">
           <Label htmlFor="lead-select">Select Lead</Label>
@@ -301,6 +383,48 @@ export function EmailComposer({ className }: EmailComposerProps) {
         {/* Generated Email */}
         {(subject || body) && (
           <div className="space-y-4 pt-4 border-t border-border">
+            {/* Preview Toggle */}
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">Preview & Edit</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs gap-1.5"
+                onClick={() => setShowPreview(!showPreview)}
+              >
+                {showPreview ? (
+                  <>
+                    <EyeOff className="w-3 h-3" />
+                    Hide Preview
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-3 h-3" />
+                    Show Preview
+                  </>
+                )}
+              </Button>
+            </div>
+
+            {/* Preview Section */}
+            {showPreview && (
+              <div className="mb-4 p-4 rounded-lg bg-muted border border-border">
+                <div className="space-y-3">
+                  <div>
+                    <span className="text-xs font-semibold text-muted-foreground uppercase">Subject</span>
+                    <p className="mt-1 text-sm font-medium break-words">{subject}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold text-muted-foreground uppercase">Preview</span>
+                    <div className="mt-1 text-sm whitespace-pre-wrap break-words bg-background p-3 rounded border max-h-64 overflow-y-auto">
+                      {body.replace(/\{\{name\}\}/gi, selectedLead?.name?.split(" ")[0] || "[First Name]")}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Edit Fields */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="subject">Subject Line</Label>
@@ -360,16 +484,16 @@ export function EmailComposer({ className }: EmailComposerProps) {
                 Regenerate
               </Button>
               <Button
-                className="flex-1 gap-2"
+                className="flex-1 gap-2 bg-gradient-to-r from-emerald-600 to-emerald-600/80 hover:from-emerald-700 hover:to-emerald-700/80"
                 onClick={handleSendEmail}
-                disabled={isSending || !selectedLead?.email}
+                disabled={isSending || !selectedLead?.email || !selectedCampaignId}
               >
                 {isSending ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <Send className="w-4 h-4" />
                 )}
-                Send Email
+                {isSending ? "Sending..." : "Send to Campaign"}
               </Button>
             </div>
           </div>

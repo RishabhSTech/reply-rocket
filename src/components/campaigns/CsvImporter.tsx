@@ -1,5 +1,4 @@
 import { useState, useCallback } from "react";
-import { useDropzone } from "react-dropzone";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -28,15 +27,6 @@ export function CsvImporter({ campaignId, onImportComplete }: CsvImporterProps) 
         }
     }, []);
 
-    const { getRootProps, getInputProps, isDragActive } = useDropzone({
-        onDrop,
-        accept: {
-            'text/csv': ['.csv'],
-            'application/vnd.ms-excel': ['.csv']
-        },
-        maxFiles: 1
-    });
-
     const parseCSV = (text: string) => {
         const lines = text.split('\n');
         const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
@@ -59,15 +49,14 @@ export function CsvImporter({ campaignId, onImportComplete }: CsvImporterProps) 
                 // Handle quoted values better in production, simpler split for now
                 const values = line.split(',');
                 return {
-                    email: values[emailIdx]?.trim(),
+                    email: values[emailIdx]?.trim() || '',
                     name: nameIdx !== -1 ? values[nameIdx]?.trim() : 'Unknown',
-                    company: companyIdx !== -1 ? values[companyIdx]?.trim() : '',
                     position: positionIdx !== -1 ? values[positionIdx]?.trim() : '',
-                    founder_linkedin: linkedInIdx !== -1 ? values[linkedInIdx]?.trim() : '',
-                    website_url: websiteIdx !== -1 ? values[websiteIdx]?.trim() : '',
+                    requirement: '', // Default requirement
+                    founder_linkedin: linkedInIdx !== -1 ? values[linkedInIdx]?.trim() : null,
+                    website_url: websiteIdx !== -1 ? values[websiteIdx]?.trim() : null,
                     // Default fields
                     status: 'pending',
-                    user_id: (supabase.auth.getUser() as any)?.id, // Temporary check, verified later
                 };
             })
             .filter(row => row.email && row.email.includes('@')); // Basic validation
@@ -88,13 +77,11 @@ export function CsvImporter({ campaignId, onImportComplete }: CsvImporterProps) 
                 const { data: { user } } = await supabase.auth.getUser();
                 if (!user) throw new Error("Not authenticated");
 
-                // Prepare data for insertion
-                // Note: Assuming 'leads' table has campaign_id or we link afterwards due to current schema limitations
-                // Ideally: leads table has 'campaign_id'. If not, we insert global leads.
+                // Prepare data for insertion with campaign_id
                 const leadsToInsert = leads.map(lead => ({
                     ...lead,
                     user_id: user.id,
-                    // campaign_id: campaignId // Uncomment if schema supports it
+                    campaign_id: campaignId,
                 }));
 
                 const { error: insertError } = await supabase
@@ -138,37 +125,42 @@ export function CsvImporter({ campaignId, onImportComplete }: CsvImporterProps) 
                 </DialogHeader>
 
                 <div className="space-y-4 py-4">
-                    <div
-                        {...getRootProps()}
-                        className={`
-              border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors
-              ${isDragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-primary/50'}
-              ${file ? 'bg-primary/5 border-primary' : ''}
-            `}
-                    >
-                        <input {...getInputProps()} />
-
-                        {file ? (
-                            <div className="flex flex-col items-center gap-2">
-                                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary">
-                                    <File className="w-5 h-5" />
+                    <div className="border-2 border-dashed rounded-lg p-8 text-center">
+                        <input
+                            type="file"
+                            accept=".csv"
+                            onChange={(e) => {
+                                const selectedFile = e.target.files?.[0];
+                                if (selectedFile) {
+                                    setFile(selectedFile);
+                                }
+                            }}
+                            className="hidden"
+                            id="csv-input"
+                        />
+                        <label htmlFor="csv-input" className="cursor-pointer block">
+                            {file ? (
+                                <div className="flex flex-col items-center gap-2">
+                                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary">
+                                        <File className="w-5 h-5" />
+                                    </div>
+                                    <div className="text-sm font-medium">{file.name}</div>
+                                    <div className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(1)} KB</div>
+                                    <Button variant="ghost" size="sm" onClick={(e) => {
+                                        e.stopPropagation();
+                                        setFile(null);
+                                        setStats(null);
+                                    }}>Remove</Button>
                                 </div>
-                                <div className="text-sm font-medium">{file.name}</div>
-                                <div className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(1)} KB</div>
-                                <Button variant="ghost" size="sm" onClick={(e) => {
-                                    e.stopPropagation();
-                                    setFile(null);
-                                    setStats(null);
-                                }}>Remove</Button>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center gap-2 text-muted-foreground">
-                                <Upload className="w-8 h-8 mb-2 opacity-50" />
-                                <p className="text-sm font-medium">Drag & drop your CSV here</p>
-                                <p className="text-xs">or click to select file</p>
-                                <p className="text-xs pt-2 text-muted-foreground/70">Required: email column</p>
-                            </div>
-                        )}
+                            ) : (
+                                <div className="flex flex-col items-center gap-2 text-muted-foreground hover:text-primary transition-colors">
+                                    <Upload className="w-8 h-8 mb-2 opacity-50" />
+                                    <p className="text-sm font-medium">Click to select CSV file</p>
+                                    <p className="text-xs">or drag & drop</p>
+                                    <p className="text-xs pt-2 text-muted-foreground/70">Required: email column</p>
+                                </div>
+                            )}
+                        </label>
                     </div>
 
                     {error && (

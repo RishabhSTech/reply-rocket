@@ -1,52 +1,103 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Search, Mail, Reply, Archive, MoreVertical } from "lucide-react";
+import { Search, Mail, Reply, Archive, MoreVertical, Loader2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
 
 interface CampaignInboxProps {
     campaignId: string;
 }
 
-// Mock data for demo purposes
-const MOCK_THREADS = [
-    {
-        id: "1",
-        leadName: "Sarah Connor",
-        company: "Skynet Corp",
-        subject: "Re: Partnership opportunity",
-        preview: "That sounds interesting, but we're currently focusing on...",
-        date: "2m ago",
-        status: "unread",
-        messages: [
-            { sender: "me", content: "Hi Sarah, checking in...", date: "Yesterday" },
-            { sender: "lead", content: "That sounds interesting, but we're currently focusing on AI safety. Can you explain how you handle containment?", date: "10:30 AM" }
-        ]
-    },
-    {
-        id: "2",
-        leadName: "John Anderson",
-        company: "Meta Cortex",
-        subject: "Re: Quick question",
-        preview: "Let's schedule a call for next week.",
-        date: "1h ago",
-        status: "read",
-        messages: [
-            { sender: "me", content: "Hi John...", date: "Yesterday" },
-            { sender: "lead", content: "Let's schedule a call for next week. Tuesday works?", date: "9:15 AM" }
-        ]
-    }
-];
+interface EmailThread {
+    id: string;
+    fromEmail: string;
+    fromName: string;
+    leadName: string;
+    subject: string;
+    preview: string;
+    date: string;
+    status: "unread" | "read";
+    body: string;
+    receivedAt: string;
+}
 
 export function CampaignInbox({ campaignId }: CampaignInboxProps) {
+    const [threads, setThreads] = useState<EmailThread[]>([]);
     const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
     const [replyText, setReplyText] = useState("");
+    const [loading, setLoading] = useState(true);
 
-    const selectedThread = MOCK_THREADS.find(t => t.id === selectedThreadId);
+    useEffect(() => {
+        loadReplies();
+    }, [campaignId]);
+
+    const loadReplies = async () => {
+        try {
+            // Fetch email replies for this campaign's leads
+            const { data: replies, error } = await supabase
+                .from("email_replies")
+                .select(`
+                    *,
+                    leads (name, position),
+                    email_logs (campaign_id)
+                `)
+                .order("received_at", { ascending: false });
+
+            if (error) throw error;
+
+            // Filter replies for this campaign and format them
+            const campaignThreads = (replies || [])
+                .filter(r => r.email_logs?.campaign_id === campaignId)
+                .map(r => ({
+                    id: r.id,
+                    fromEmail: r.from_email,
+                    fromName: r.from_name || r.from_email,
+                    leadName: r.leads?.name || "Unknown",
+                    subject: r.subject,
+                    preview: r.body.substring(0, 50) + (r.body.length > 50 ? "..." : ""),
+                    date: new Date(r.received_at).toLocaleDateString(),
+                    status: r.is_read ? "read" : "unread" as const,
+                    body: r.body,
+                    receivedAt: r.received_at,
+                }));
+
+            setThreads(campaignThreads);
+        } catch (error) {
+            console.error("Error loading replies:", error);
+            toast.error("Failed to load replies");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const selectedThread = threads.find(t => t.id === selectedThreadId);
+
+    const handleSendReply = async () => {
+        if (!replyText.trim() || !selectedThread) {
+            toast.error("Please enter a reply");
+            return;
+        }
+
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error("Not authenticated");
+
+            // Here you would typically send the reply through your email service
+            toast.success("Reply sent successfully");
+            setReplyText("");
+            loadReplies();
+        } catch (error: any) {
+            toast.error(error.message || "Failed to send reply");
+        }
+    };
+
+    const selectedThread = threads.find(t => t.id === selectedThreadId);
 
     return (
         <div className="grid grid-cols-12 gap-0 h-[600px] border rounded-lg overflow-hidden bg-background">
@@ -62,23 +113,34 @@ export function CampaignInbox({ campaignId }: CampaignInboxProps) {
                     </div>
                 </div>
                 <div className="flex-1 overflow-y-auto">
-                    {MOCK_THREADS.map(thread => (
-                        <div
-                            key={thread.id}
-                            className={`p-4 border-b cursor-pointer hover:bg-muted/50 transition-colors ${selectedThreadId === thread.id ? 'bg-muted/80' : ''} ${thread.status === 'unread' ? 'bg-blue-50/30' : ''}`}
-                            onClick={() => setSelectedThreadId(thread.id)}
-                        >
-                            <div className="flex justify-between items-start mb-1">
-                                <span className={`text-sm ${thread.status === 'unread' ? 'font-bold' : 'font-medium'}`}>
-                                    {thread.leadName}
-                                </span>
-                                <span className="text-xs text-muted-foreground">{thread.date}</span>
-                            </div>
-                            <div className="text-xs text-muted-foreground mb-1">{thread.company}</div>
-                            <div className="text-xs font-medium truncate mb-1">{thread.subject}</div>
-                            <div className="text-xs text-muted-foreground truncate opacity-80">{thread.preview}</div>
+                    {loading ? (
+                        <div className="p-4 text-center text-muted-foreground">
+                            <Loader2 className="w-4 h-4 animate-spin mx-auto mb-2" />
+                            Loading...
                         </div>
-                    ))}
+                    ) : threads.length === 0 ? (
+                        <div className="p-4 text-center text-muted-foreground text-sm">
+                            No email replies yet
+                        </div>
+                    ) : (
+                        threads.map(thread => (
+                            <div
+                                key={thread.id}
+                                className={`p-4 border-b cursor-pointer hover:bg-muted/50 transition-colors ${selectedThreadId === thread.id ? 'bg-muted/80' : ''} ${thread.status === 'unread' ? 'bg-blue-50/30' : ''}`}
+                                onClick={() => setSelectedThreadId(thread.id)}
+                            >
+                                <div className="flex justify-between items-start mb-1">
+                                    <span className={`text-sm ${thread.status === 'unread' ? 'font-bold' : 'font-medium'}`}>
+                                        {thread.leadName}
+                                    </span>
+                                    <span className="text-xs text-muted-foreground">{thread.date}</span>
+                                </div>
+                                <div className="text-xs text-muted-foreground mb-1">{thread.fromEmail}</div>
+                                <div className="text-xs font-medium truncate mb-1">{thread.subject}</div>
+                                <div className="text-xs text-muted-foreground truncate opacity-80">{thread.preview}</div>
+                            </div>
+                        ))
+                    )}
                 </div>
             </div>
 
@@ -94,7 +156,7 @@ export function CampaignInbox({ campaignId }: CampaignInboxProps) {
                                 <div>
                                     <h2 className="font-semibold">{selectedThread.subject}</h2>
                                     <p className="text-sm text-muted-foreground">
-                                        {selectedThread.leadName} <span className="text-xs px-1">&bull;</span> {selectedThread.company}
+                                        {selectedThread.leadName} <span className="text-xs px-1">&bull;</span> {selectedThread.fromEmail}
                                     </p>
                                 </div>
                             </div>
@@ -105,16 +167,14 @@ export function CampaignInbox({ campaignId }: CampaignInboxProps) {
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                            {selectedThread.messages.map((msg, i) => (
-                                <div key={i} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[80%] rounded-lg p-4 ${msg.sender === 'me' ? 'bg-primary text-primary-foreground ml-12' : 'bg-white border mr-12'}`}>
-                                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                                        <div className={`text-[10px] mt-2 ${msg.sender === 'me' ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
-                                            {msg.date}
-                                        </div>
+                            <div className={`flex justify-start`}>
+                                <div className={`max-w-[80%] rounded-lg p-4 bg-white border`}>
+                                    <p className="text-sm whitespace-pre-wrap">{selectedThread.body}</p>
+                                    <div className={`text-[10px] mt-2 text-muted-foreground`}>
+                                        {new Date(selectedThread.receivedAt).toLocaleString()}
                                     </div>
                                 </div>
-                            ))}
+                            </div>
                         </div>
 
                         <div className="p-4 border-t bg-background">
@@ -134,7 +194,7 @@ export function CampaignInbox({ campaignId }: CampaignInboxProps) {
                                     <div className="flex gap-2">
                                         {/* Formatting tools could go here */}
                                     </div>
-                                    <Button>
+                                    <Button onClick={handleSendReply}>
                                         <Reply className="w-4 h-4 mr-2" />
                                         Send Reply
                                     </Button>

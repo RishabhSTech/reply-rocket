@@ -51,23 +51,13 @@ export function CampaignLeads({ campaignId }: CampaignLeadsProps) {
 
     const loadLeads = async () => {
         try {
-            // In a real implementation, we would filter by campaign_id
-            // For now, we'll fetch all leads and simulate the relationship
-            // OR we assuming schema update: leads has campaign_id
-
-            // Let's check if we can filter by campaign_id
-            // If not, we might need to create a junction table or add the column
-            // Proceeding with assumption that 'campaign_id' column exists or we fetch all for now
-
             const { data, error } = await supabase
                 .from("leads")
                 .select("*")
+                .eq("campaign_id", campaignId)
                 .order("created_at", { ascending: false });
 
             if (error) throw error;
-
-            // Filter client-side if needed (or server side if column exists)
-            // For this demo, we'll show all leads but ideally we filter: .eq('campaign_id', campaignId)
             setLeads(data || []);
         } catch (error) {
             console.error("Error loading leads:", error);
@@ -78,7 +68,23 @@ export function CampaignLeads({ campaignId }: CampaignLeadsProps) {
     };
 
     const handleAddLead = () => {
-        toast.info("Import Leads feature coming soon");
+        toast.info("Use CSV Import or add individual leads from the Leads page");
+    };
+
+    const handleRemoveLead = async (leadId: string) => {
+        try {
+            const { error } = await supabase
+                .from("leads")
+                .update({ campaign_id: null })
+                .eq("id", leadId);
+
+            if (error) throw error;
+            toast.success("Lead removed from campaign");
+            loadLeads();
+        } catch (error: any) {
+            console.error("Error removing lead:", error);
+            toast.error("Failed to remove lead");
+        }
     };
 
     const filteredLeads = leads.filter(lead =>
@@ -166,7 +172,7 @@ export function CampaignLeads({ campaignId }: CampaignLeadsProps) {
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
                                             <DropdownMenuItem>View Details</DropdownMenuItem>
-                                            <DropdownMenuItem>Remove from Campaign</DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleRemoveLead(lead.id)}>Remove from Campaign</DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </div>
