@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import { SequenceBuilder } from "@/components/campaigns/SequenceBuilder";
 import { CampaignOverview } from "@/components/campaigns/CampaignOverview";
 import { CampaignLeads } from "@/components/campaigns/CampaignLeads";
+import { CampaignSettings } from "@/components/campaigns/CampaignSettings";
+import { CampaignInbox } from "@/components/campaigns/CampaignInbox";
 
 const CampaignDetailsPage = () => {
     const { id } = useParams<{ id: string }>();
@@ -94,6 +96,12 @@ const CampaignDetailsPage = () => {
                                 >
                                     Settings
                                 </TabsTrigger>
+                                <TabsTrigger
+                                    value="inbox"
+                                    className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-3"
+                                >
+                                    Inbox
+                                </TabsTrigger>
                             </TabsList>
 
                             <div className="mt-6">
@@ -109,11 +117,11 @@ const CampaignDetailsPage = () => {
                                         initialSequence={campaign.sequence || []}
                                     />
                                 </TabsContent>
+                                <TabsContent value="inbox">
+                                    <CampaignInbox campaignId={campaign.id} />
+                                </TabsContent>
                                 <TabsContent value="settings">
-                                    <div className="p-4 bg-white rounded-lg border">
-                                        <h3 className="text-lg font-medium mb-4">Campaign Settings</h3>
-                                        <p className="text-sm text-muted-foreground">Campaign configuration will be implemented here.</p>
-                                    </div>
+                                    <CampaignSettings campaignId={campaign.id} />
                                 </TabsContent>
                             </div>
                         </Tabs>
