@@ -30,6 +30,7 @@ interface Campaign {
   id: string;
   name: string;
   status: string;
+  prompt_json?: any;
 }
 
 interface CompanyInfo {
@@ -82,13 +83,13 @@ export function EmailComposer({ className }: EmailComposerProps) {
 
     const { data, error } = await supabase
       .from("campaigns")
-      .select("id, name, status")
+      .select("id, name, status, prompt_json")
       .eq("user_id", user.id)
       .eq("status", "active")
       .order("created_at", { ascending: false });
 
     if (!error && data) {
-      setCampaigns(data);
+      setCampaigns(data as any);
     }
   };
 
@@ -135,10 +136,11 @@ export function EmailComposer({ className }: EmailComposerProps) {
           leadName: selectedLead.name,
           leadPosition: selectedLead.position,
           leadRequirement: selectedLead.requirement,
-          leadLinkedIn: selectedLead.founder_linkedin, // Used for research-based context
-          leadWebsite: selectedLead.website_url,       // Used for research-based context
+          leadLinkedIn: selectedLead.founder_linkedin,
+          leadWebsite: selectedLead.website_url,
           tone,
           companyInfo: companyInfo || {},
+          campaignContext: campaigns.find(c => c.id === selectedCampaignId)?.prompt_json,
           provider,
         },
       });

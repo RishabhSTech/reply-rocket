@@ -114,6 +114,11 @@ serve(async (req: Request) => {
     const emailSubject = subject || `Quick question for ${lead?.name || "you"}`;
     let emailBody = body || generateEmailBody(lead, smtpSettings.from_name);
 
+    // Append signature if sending from Composer (body provided) and it doesn't already have the name
+    if (body && !body.includes(smtpSettings.from_name)) {
+      emailBody += `\n\nLooking forward to hearing from you.\n\nBest,\n${smtpSettings.from_name}`;
+    }
+
     // 1. Insert log first with 'pending' status to get the ID
     const { data: logEntry, error: logError } = await supabase.from("email_logs").insert({
       user_id: userId,

@@ -21,6 +21,7 @@ interface GenerateEmailRequest {
     keyBenefits?: string;
   };
   provider?: 'claude' | 'openai' | 'lovable';
+  campaignContext?: any;
 }
 
 // Import the refined prompt templates
@@ -60,7 +61,7 @@ const emailTemplates = {
 /**
  * Build optimized system prompt with research-based personalization
  */
-function buildSystemPrompt(companyInfo?: GenerateEmailRequest['companyInfo']): string {
+function buildSystemPrompt(companyInfo?: GenerateEmailRequest['companyInfo'], campaignContext?: any): string {
   const corePrinciples = `You are an elite AI SDR writing personalized cold emails based on genuine research.
 
 YOUR CORE APPROACH:
@@ -97,7 +98,7 @@ RESEARCH SIGNALS:
 - Show understanding of their industry challenges
 - Demonstrate you know what they're actually working on`;
 
-  const companyContext = companyInfo?.companyName
+  const companyContextStr = companyInfo?.companyName
     ? `\n\nYOUR COMPANY (Use this for context, don't hard-sell):
 - Name: ${companyInfo.companyName}
 - What we do: ${companyInfo.description || 'Not specified'}
@@ -106,7 +107,12 @@ RESEARCH SIGNALS:
 - How we help: ${companyInfo.keyBenefits || 'Not specified'}`
     : '';
 
-  return `${corePrinciples}${companyContext}
+  const customInstructions = campaignContext
+    ? `\n\nCAMPAIGN SPECIFIC INSTRUCTIONS (PRIORITIZE THESE):
+${typeof campaignContext === 'string' ? campaignContext : JSON.stringify(campaignContext, null, 2)}`
+    : '';
+
+  return `${corePrinciples}${companyContextStr}${customInstructions}
 
 OUTPUT FORMAT (JSON ONLY - NO MARKDOWN):
 {
@@ -123,11 +129,11 @@ function buildUserPrompt(request: GenerateEmailRequest): string {
 
   // Build research context - this is what signals "I did my homework"
   let researchContext = '';
-  
+
   if (request.leadWebsite) {
     researchContext += `\nVISITED THEIR WEBSITE: ${request.leadWebsite}`;
   }
-  
+
   if (request.leadLinkedIn) {
     researchContext += `\nVISITED THEIR LINKEDIN: ${request.leadLinkedIn}`;
   }
@@ -305,7 +311,7 @@ serve(async (req) => {
     const provider = request.provider || 'lovable';
 
     // Build prompts using refined templates
-    const systemPrompt = buildSystemPrompt(request.companyInfo);
+    const systemPrompt = buildSystemPrompt(request.companyInfo, request.campaignContext);
     const userPrompt = buildUserPrompt(request);
 
     // Call AI provider
