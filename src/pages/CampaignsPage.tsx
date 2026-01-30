@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
@@ -330,7 +330,9 @@ const CampaignsPage = () => {
                         <Mail className="h-5 w-5 text-primary" />
                       </div>
                       <div>
-                        <CardTitle className="text-lg">{campaign.name}</CardTitle>
+                        <Link to={`/campaigns/${campaign.id}`} className="hover:underline">
+                          <CardTitle className="text-lg">{campaign.name}</CardTitle>
+                        </Link>
                         <Badge
                           variant={
                             campaign.status === "active" ? "default" : "secondary"
