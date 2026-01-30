@@ -342,6 +342,7 @@ serve(async (req) => {
     console.log("  - Tone:", request.tone);
     console.log("  - Has companyInfo:", !!request.companyInfo?.companyName);
     console.log("  - Has contextJson:", !!request.contextJson);
+    console.log("  - contextJson content:", request.contextJson ? JSON.stringify(request.contextJson).substring(0, 300) : "NONE");
     console.log("  - Has campaignContext:", !!request.campaignContext);
 
     // Build prompts using refined templates

@@ -184,22 +184,24 @@ serve(async (req: Request) => {
     const trackingUrl = trackingUrlObj.toString();
 
     // Ensure tracking pixel is properly formed and will be loaded
-    const trackingPixel = `<img src="${trackingUrl}" width="1" height="1" alt="" style="display:none;border:0;" />`;
+    // Use display:block inside a container with overflow:hidden - more reliable than display:none
+    const trackingPixel = `<img src="${trackingUrl}" width="1" height="1" alt="" style="display:block;border:0;" />`;
 
     // Convert newlines to BR and wrap in proper HTML structure
-    // This ensures email clients render HTML version (which includes tracking pixel)
+    // Separate pixel in its own div to ensure it loads
     const bodyWithBreaks = emailBody.replace(/\n/g, "<br />");
     const htmlBody = `<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"></head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-${bodyWithBreaks}
-${trackingPixel}
+<div>${bodyWithBreaks}</div>
+<div style="height:1px;overflow:hidden;">${trackingPixel}</div>
 </body>
 </html>`;
     
     console.log(`✅ Tracking pixel appended for email_log: ${logEntry.id}`);
     console.log(`📍 Tracking URL: ${trackingUrl}`);
+    console.log(`📧 HTML Body includes tracking:`, htmlBody.includes('track-email'));
 
     // Send email via SMTP
     const client = new SMTPClient({
