@@ -475,6 +475,9 @@ export function EmailComposer({ className }: EmailComposerProps) {
                     <span className="text-xs font-semibold text-muted-foreground uppercase">Preview</span>
                     <div className="mt-1 text-sm whitespace-pre-wrap break-words bg-background p-3 rounded border max-h-64 overflow-y-auto">
                       {body.replace(/\{\{name\}\}/gi, selectedLead?.name?.split(" ")[0] || "[First Name]")}
+                      <div className="mt-4 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
+                        ✓ Tracking pixel will be automatically added when sent
+                      </div>
                     </div>
                   </div>
                 </div>

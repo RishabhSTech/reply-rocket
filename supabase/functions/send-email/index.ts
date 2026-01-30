@@ -186,9 +186,17 @@ serve(async (req: Request) => {
     // Ensure tracking pixel is properly formed and will be loaded
     const trackingPixel = `<img src="${trackingUrl}" width="1" height="1" alt="" style="display:none;border:0;" />`;
 
-    // Convert newlines to BR and append pixel at the end of body
-    // Use <br /> for proper XHTML compliance
-    const htmlBody = emailBody.replace(/\n/g, "<br />") + `<br /><br />${trackingPixel}`;
+    // Convert newlines to BR and wrap in proper HTML structure
+    // This ensures email clients render HTML version (which includes tracking pixel)
+    const bodyWithBreaks = emailBody.replace(/\n/g, "<br />");
+    const htmlBody = `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+${bodyWithBreaks}
+${trackingPixel}
+</body>
+</html>`;
     
     console.log(`✅ Tracking pixel appended for email_log: ${logEntry.id}`);
     console.log(`📍 Tracking URL: ${trackingUrl}`);
