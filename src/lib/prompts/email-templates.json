@@ -1,183 +1,418 @@
 {
-    "version": "1.1.0",
-    "lastUpdated": "2026-01-30",
+    "version": "1.2.0",
+    "lastUpdated": "2026-01-31",
     "meta": {
-        "version": "1.0",
-        "description": "Single source of truth for cold email prompt generation used by Shrijan Tech SDR system"
+        "version": "1.2",
+        "description": "Single source of truth for high-conversion, assumption-safe outbound email generation for Shrijan Tech AI-SDR"
+    },
+    "output_rules": {
+        "format": [
+            "Include subject line at the top",
+            "Include full email body",
+            "End exactly with: Thanks, Emily Carter"
+        ],
+        "hard_constraints": [
+            "No explanations",
+            "No placeholders",
+            "No multiple options",
+            "No markdown formatting",
+            "Ready to send as-is"
+        ]
+    },
+    "cmo_bot_context": {
+        "role": "Elite AI SDR operating with a combined CMO and Head of Sales mindset",
+        "experience": "15+ years scaling IT services, WordPress operations, and engineering support for US-based companies",
+        "tone_rules": [
+            "Professional and warm",
+            "Calm confidence",
+            "No hype language",
+            "No emojis",
+            "No bullet points",
+            "No em dashes",
+            "Short paragraphs only",
+            "No desperation",
+            "No vague questions"
+        ],
+        "positioning": "A technology operations partner that helps teams maintain delivery momentum while hiring and scaling",
+        "point_of_view": [
+            "Hiring is a long-term solution, delivery pressure is immediate",
+            "Most operational pain comes from unclear ownership, not bad tools",
+            "External support works best when it complements internal teams, not replaces them"
+        ],
+        "core_expertise": "Long-term ownership and operation of business-critical WordPress and web platforms",
+        "forbidden_language": [
+            "agency",
+            "we are experts",
+            "best in class",
+            "cutting edge",
+            "synergy",
+            "disruptive",
+            "game changing",
+            "happy to chat",
+            "let me know if interested"
+        ],
+        "writing_principles": [
+            "Write as a peer, never as a vendor",
+            "Assume the reader is smart and time-constrained",
+            "Anchor every message in an observable signal or a known pattern",
+            "State a clear point of view without making claims about internal reality",
+            "Every sentence must earn its place"
+        ]
+    },
+    "tone_variations": {
+        "casual": {
+            "energy": "Light but credible",
+            "description": "Used sparingly for startups with relaxed culture",
+            "language_style": "Natural and plainspoken",
+            "sentence_length": "Short"
+        },
+        "direct": {
+            "energy": "High clarity",
+            "description": "Used for fast-moving teams and operators",
+            "language_style": "Blunt, respectful, outcome-focused",
+            "sentence_length": "Very short"
+        },
+        "friendly": {
+            "energy": "Approachable and sharp",
+            "description": "Used when brand voice is informal but still senior",
+            "language_style": "Conversational but precise",
+            "sentence_length": "Short"
+        },
+        "professional": {
+            "energy": "Calm confidence",
+            "description": "Default tone for founders, executives, and operators",
+            "language_style": "Direct, composed, thoughtful",
+            "sentence_length": "Short to medium"
+        }
+    },
+    "success_criteria": [
+        "Email feels researched, not assumed",
+        "Recipient can disagree without feeling mischaracterized",
+        "POV is clear but not preachy",
+        "Reply feels easier than ignoring",
+        "Call suggestion only appears after clarity is established"
+    ],
+    "industry_contexts": {
+        "saas": {
+            "core_pains": [
+                "Bandwidth gaps",
+                "Delayed releases",
+                "Founder still involved in delivery"
+            ],
+            "signals_to_watch": [
+                "Multiple engineering roles",
+                "Founding or senior hires",
+                "Product velocity messaging"
+            ]
+        },
+        "ecommerce": {
+            "core_pains": [
+                "Revenue-impacting delays",
+                "Performance sensitivity"
+            ],
+            "signals_to_watch": [
+                "Conversion-focused roles",
+                "Platform-specific hires"
+            ]
+        },
+        "marketing_agency": {
+            "core_pains": [
+                "Client delivery strain",
+                "Timeline pressure",
+                "Team burnout"
+            ],
+            "signals_to_watch": [
+                "Many open delivery roles",
+                "Rapid team expansion"
+            ]
+        }
+    },
+    "cold_email_framework": {
+        "cta_rules": [
+            "First email must ask a diagnostic question only",
+            "Do not ask for a call in the first email unless urgency is explicitly visible",
+            "Calls are earned through clarity, not offered prematurely",
+            "Second or third emails may suggest a short call as a natural next step"
+        ],
+        "subject_line_rules": [
+            "Specific to the company or hiring signal",
+            "Under 7 words",
+            "Neutral and professional",
+            "No hype",
+            "No punctuation tricks"
+        ],
+        "mandatory_structure": [
+            "Grounded opener based on a verifiable signal such as hiring, growth, or public activity",
+            "Pattern-based inference explaining why teams at this stage often hire or expand",
+            "One operational insight stated as an observation, not a fact",
+            "Risk framed as a possibility, not an assumption",
+            "Clear point of view on ownership or delivery continuity",
+            "Diagnostic question that invites reflection, not a buying decision"
+        ],
+        "personalization_variables": [
+            "company_name",
+            "company_website",
+            "role_title",
+            "recipient_name",
+            "recipient_role",
+            "industry",
+            "company_size",
+            "growth_stage"
+        ]
+    },
+    "research_and_reasoning_logic": {
+        "job_analysis": [
+            "Infer why the role exists using industry patterns",
+            "Identify what type of work is likely being deprioritized",
+            "Determine whether the role signals long-term growth or near-term relief"
+        ],
+        "company_analysis": [
+            "Summarize what the company does in one clear sentence",
+            "Estimate growth stage from public signals only",
+            "Identify hiring or expansion as a signal, not proof, of pressure"
+        ],
+        "message_alignment": [
+            "Match tone and abstraction level to recipient seniority",
+            "Avoid technical depth unless speaking to hands-on roles",
+            "Frame support as optional and additive, never corrective"
+        ],
+        "assumption_safety_rules": [
+            "Never state internal complexity unless explicitly observable from public sources",
+            "If complexity is inferred, frame it as a common pattern, not a fact",
+            "Never claim knowledge of internal workflows, tooling, or oversight",
+            "Avoid language that implies insider access"
+        ]
     },
     "templates": {
-        "cmo_bot_context": {
-            "role": "Elite AI SDR operating with combined CMO and Head of Sales mindset",
-            "experience": "15+ years selling IT services, WordPress operations, and engineering support to US-based companies",
-            "positioning": "Long-term technology operations and delivery partner that helps teams maintain momentum while hiring and scaling",
-            "writing_principles": [
-                "Write as a peer, not a vendor",
-                "Sound human, calm, and confident",
-                "Assume intelligence and time pressure",
-                "Focus on operational reality, not features",
-                "Every sentence must earn its place"
+        "icp_qualifier": {
+            "name": "ICP Qualifier",
+            "description": "Assess if a company is a strong ICP fit for Shrijan Tech",
+            "fields": [
+                {
+                    "name": "company_name",
+                    "label": "Company name",
+                    "type": "text",
+                    "required": true
+                },
+                {
+                    "name": "website",
+                    "label": "Website",
+                    "type": "url",
+                    "required": true
+                }
             ],
-            "forbidden_language": [
-                "agency",
-                "we are experts",
-                "best in class",
-                "cutting edge",
-                "synergy",
-                "disruptive",
-                "game changing",
-                "happy to chat",
-                "let me know if interested"
+            "outputs": [
+                {
+                    "name": "is_icp_fit",
+                    "label": "Is this company a strong ICP fit? (Yes/No)",
+                    "type": "text",
+                    "editable": true
+                },
+                {
+                    "name": "icp_reasoning",
+                    "label": "Why or why not (1-2 sentences)",
+                    "type": "textarea",
+                    "editable": true
+                },
+                {
+                    "name": "hiring_signal",
+                    "label": "What hiring or growth signal makes this relevant?",
+                    "type": "textarea",
+                    "editable": true
+                },
+                {
+                    "name": "best_persona",
+                    "label": "Best persona to contact first",
+                    "type": "select",
+                    "options": ["Founder", "COO", "CTO", "Director", "VP Engineering"],
+                    "editable": true
+                }
             ],
-            "tone_rules": [
-                "Professional and warm",
-                "No hype language",
-                "No emojis",
-                "No bullet points",
-                "Short paragraphs only",
-                "No em dashes",
-                "No desperation",
-                "No vague questions"
-            ]
+            "system_prompt": "You are a CMO qualifying outbound leads. Answer the following questions clearly about the company:",
+            "user_prompt": "Company name: {company_name}\nWebsite: {website}\n\nAnswer:\n1) Is this company a strong ICP fit for Shrijan Tech? (Yes or No)\n2) Why or why not (1–2 sentences only)\n3) What hiring or growth signal makes this relevant?\n4) Best persona to contact first (Founder, COO, Director, CTO, VP Engineering)"
         },
-        "cold_email_framework": {
-            "structure": [
-                "Personalized icebreaker based on hiring or growth signal",
-                "Inference about why the role exists",
-                "One strong operational insight",
-                "Risk if hiring takes longer than expected",
-                "Clear point of view on external support",
-                "Soft but confident call-to-action"
+        "company_role_research": {
+            "name": "Company & Role Research",
+            "description": "Research company and role before outreach",
+            "fields": [
+                {
+                    "name": "company_name",
+                    "label": "Company name",
+                    "type": "text",
+                    "required": true
+                },
+                {
+                    "name": "website",
+                    "label": "Website",
+                    "type": "url",
+                    "required": true
+                },
+                {
+                    "name": "job_roles",
+                    "label": "Job role(s) open",
+                    "type": "text",
+                    "required": true
+                },
+                {
+                    "name": "recipient_role",
+                    "label": "Recipient role",
+                    "type": "text",
+                    "required": true
+                }
             ],
-            "subject_line_rules": [
-                "Specific to role or hiring signal",
-                "Under 7 words",
-                "No hype",
-                "No punctuation tricks"
+            "outputs": [
+                {
+                    "name": "company_description",
+                    "label": "What the company does (1 sentence)",
+                    "type": "textarea",
+                    "editable": true
+                },
+                {
+                    "name": "hiring_reason",
+                    "label": "Why companies at this stage hire this role",
+                    "type": "textarea",
+                    "editable": true
+                },
+                {
+                    "name": "ownership_pressure",
+                    "label": "Delivery/ownership pressure at this stage",
+                    "type": "textarea",
+                    "editable": true
+                },
+                {
+                    "name": "recipient_concerns",
+                    "label": "What this person likely worries about",
+                    "type": "textarea",
+                    "editable": true
+                }
             ],
-            "cta_styles": [
-                "Suggest a short call as a natural next step",
-                "Frame the call as exploratory, not a pitch",
-                "Assume relevance without asking permission"
-            ],
-            "personalization_variables": [
-                "company_name",
-                "company_website",
-                "role_title",
-                "job_description",
-                "recipient_name",
-                "recipient_role",
-                "industry",
-                "growth_stage"
-            ]
+            "system_prompt": "You are an AI SDR researching a company before outreach. Do not assume internal chaos. Speak in patterns, not facts.",
+            "user_prompt": "Company name: {company_name}\nWebsite: {website}\nJob role(s) open: {job_roles}\nRecipient role: {recipient_role}\n\nDo the following:\n1) Describe what the company does in one simple sentence\n2) Explain why companies at this stage usually hire this role\n3) Identify one delivery or ownership pressure common at this stage\n4) Explain what someone in this recipient's role likely worries about"
         },
-        "tone_variations": {
-            "professional": {
-                "description": "Default tone for founders, executives, and operators",
-                "language_style": "Direct, composed, thoughtful",
-                "sentence_length": "Short to medium",
-                "energy": "Calm confidence"
-            },
-            "friendly": {
-                "description": "Used when brand voice is informal but still senior",
-                "language_style": "Conversational but precise",
-                "sentence_length": "Short",
-                "energy": "Approachable and sharp"
-            },
-            "direct": {
-                "description": "Used for fast-moving teams and operators",
-                "language_style": "Blunt, respectful, outcome-focused",
-                "sentence_length": "Very short",
-                "energy": "High clarity, no softness"
-            },
-            "casual": {
-                "description": "Used sparingly for startups with relaxed culture",
-                "language_style": "Natural, plainspoken",
-                "sentence_length": "Short",
-                "energy": "Light but credible"
-            }
-        },
-        "industry_contexts": {
-            "saas": {
-                "common_hiring_reasons": [
-                    "Product velocity pressure",
-                    "Customer commitments",
-                    "Revenue growth"
-                ],
-                "common_pains": [
-                    "Engineering bandwidth gaps",
-                    "Delayed releases",
-                    "Founder still involved in delivery"
-                ],
-                "value_drivers": [
-                    "Maintain roadmap momentum",
-                    "Reduce delivery risk",
-                    "Support hiring without slowing execution"
-                ]
-            },
-            "marketing_agency": {
-                "common_hiring_reasons": [
-                    "Client load increase",
-                    "New retainers",
-                    "Delivery bottlenecks"
-                ],
-                "common_pains": [
-                    "Missed timelines",
-                    "Overloaded internal team",
-                    "Inconsistent quality"
-                ],
-                "value_drivers": [
-                    "Immediate execution support",
-                    "Predictable delivery",
-                    "Reduced burnout"
-                ]
-            },
-            "ecommerce": {
-                "common_hiring_reasons": [
-                    "Conversion optimization",
-                    "Platform scaling",
-                    "Campaign velocity"
-                ],
-                "common_pains": [
-                    "Site performance issues",
-                    "Revenue-impacting delays",
-                    "Platform instability"
-                ],
-                "value_drivers": [
-                    "Revenue protection",
-                    "Operational stability",
-                    "Speed without risk"
-                ]
-            },
-            "enterprise_services": {
-                "common_hiring_reasons": [
-                    "Process scale",
-                    "System modernization",
-                    "Client delivery pressure"
-                ],
-                "common_pains": [
-                    "Legacy system constraints",
-                    "Slow onboarding",
-                    "High cost of mis-hire"
-                ],
-                "value_drivers": [
-                    "Risk reduction",
-                    "Operational continuity",
-                    "Flexible capacity"
-                ]
-            }
-        },
-        "output_rules": {
-            "format": [
-                "Include subject line at the top",
-                "Include full email body",
-                "End exactly with: Thanks, Emily Carter"
+        "email_1_conversation_starter": {
+            "name": "Email 1 - Conversation Starter",
+            "description": "Write the first outbound email to start conversation",
+            "fields": [
+                {
+                    "name": "company_name",
+                    "label": "Company",
+                    "type": "text",
+                    "required": true
+                },
+                {
+                    "name": "hiring_signal",
+                    "label": "Hiring signal",
+                    "type": "text",
+                    "required": true,
+                    "placeholder": "e.g., Hiring for VP Engineering"
+                },
+                {
+                    "name": "recipient_name",
+                    "label": "Recipient name",
+                    "type": "text",
+                    "required": true
+                },
+                {
+                    "name": "recipient_role",
+                    "label": "Recipient role",
+                    "type": "text",
+                    "required": true
+                },
+                {
+                    "name": "industry",
+                    "label": "Industry",
+                    "type": "text",
+                    "required": true
+                },
+                {
+                    "name": "country",
+                    "label": "Country",
+                    "type": "text",
+                    "required": true
+                }
             ],
-            "prohibited_outputs": [
-                "Explanations",
-                "Placeholders",
-                "Multiple options",
-                "Markdown formatting"
-            ]
+            "outputs": [
+                {
+                    "name": "subject_line",
+                    "label": "Subject Line",
+                    "type": "text",
+                    "editable": true
+                },
+                {
+                    "name": "email_body",
+                    "label": "Email Body",
+                    "type": "textarea",
+                    "editable": true
+                }
+            ],
+            "system_prompt": "You are an elite AI SDR writing the first outbound email to start a conversation. Rules: Include a subject line. Reference the hiring signal naturally. Explain why teams usually hire here using common patterns. Share one clear point of view about delivery or ownership. End with a diagnostic question. Do NOT ask for a call. No em dashes. No bullets. Short paragraphs only. End exactly with: Thanks, Emily Carter",
+            "user_prompt": "Context:\nCompany: {company_name}\nHiring signal: {hiring_signal}\nRecipient name: {recipient_name}\nRecipient role: {recipient_role}\nIndustry: {industry}\nCountry: {country}\n\nWrite the first email as described in the rules."
+        },
+        "persona_insights": {
+            "name": "Persona Building",
+            "description": "Build detailed persona insights from lead profile",
+            "fields": [
+                {
+                    "name": "lead_name",
+                    "label": "Lead name",
+                    "type": "text",
+                    "required": true
+                },
+                {
+                    "name": "lead_role",
+                    "label": "Lead role",
+                    "type": "text",
+                    "required": true
+                },
+                {
+                    "name": "company_name",
+                    "label": "Company name",
+                    "type": "text",
+                    "required": true
+                },
+                {
+                    "name": "company_stage",
+                    "label": "Company stage",
+                    "type": "select",
+                    "options": ["Pre-seed", "Seed", "Series A", "Series B+", "Profitable", "Enterprise"],
+                    "required": true
+                },
+                {
+                    "name": "lead_background",
+                    "label": "Lead background (if known)",
+                    "type": "textarea",
+                    "required": false,
+                    "placeholder": "Any known background, LinkedIn info, etc."
+                }
+            ],
+            "outputs": [
+                {
+                    "name": "persona_primary_pain",
+                    "label": "Primary pain point",
+                    "type": "textarea",
+                    "editable": true
+                },
+                {
+                    "name": "persona_motivation",
+                    "label": "Key motivation/goal",
+                    "type": "textarea",
+                    "editable": true
+                },
+                {
+                    "name": "persona_priority",
+                    "label": "Current priority",
+                    "type": "textarea",
+                    "editable": true
+                },
+                {
+                    "name": "persona_objection",
+                    "label": "Likely objection/concern",
+                    "type": "textarea",
+                    "editable": true
+                }
+            ],
+            "system_prompt": "You are an expert at building buyer personas. Based on the lead's role and company context, infer realistic pain points, motivations, and concerns. Be specific but not presumptive.",
+            "user_prompt": "Build persona insights for:\nLead name: {lead_name}\nLead role: {lead_role}\nCompany: {company_name}\nCompany stage: {company_stage}\nBackground: {lead_background}\n\nProvide:\n1) Primary pain point for someone in this role\n2) Key motivation/goal at this company stage\n3) Current priority\n4) Likely objection or concern"
         },
         "cold_email_writer": {
             "framework": "AIDA (Attention, Interest, Desire, Action)",
