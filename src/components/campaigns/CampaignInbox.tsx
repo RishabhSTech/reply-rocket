@@ -150,8 +150,8 @@ export function CampaignInbox({ campaignId }: CampaignInboxProps) {
     return (
         <div className="grid grid-cols-12 gap-0 h-[600px] border rounded-lg overflow-hidden bg-background">
             {/* Thread List */}
-            <div className="col-span-4 border-r flex flex-col">
-                <div className="p-4 border-b space-y-3">
+            <div className="col-span-4 border-r flex flex-col h-full overflow-hidden">
+                <div className="p-4 border-b space-y-3 flex-shrink-0">
                     <h3 className="font-semibold flex items-center gap-2">
                         <Mail className="w-4 h-4" /> Inbox
                     </h3>
@@ -160,7 +160,7 @@ export function CampaignInbox({ campaignId }: CampaignInboxProps) {
                         <Input placeholder="Search replies..." className="pl-9" />
                     </div>
                 </div>
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto min-h-0">
                     {loading ? (
                         <div className="p-4 text-center text-muted-foreground">
                             <Loader2 className="w-4 h-4 animate-spin mx-auto mb-2" />
