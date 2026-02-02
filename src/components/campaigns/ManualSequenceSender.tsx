@@ -11,11 +11,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Zap, AlertCircle, CheckCircle, Copy, ChevronRight } from "lucide-react";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
+import { Send, Zap, AlertCircle, CheckCircle, Copy, ChevronRight, Save } from "lucide-react";
+import { Input } from "@/components/ui/input";
 
 interface Campaign {
   id: string;
@@ -51,8 +52,17 @@ interface Lead {
 export function ManualSequenceSender({ campaignId }: { campaignId: string }) {
   const { toast } = useToast();
   
+  // DEFENSIVE: Ensure campaignId is defined
+  if (!campaignId) {
+    console.error("❌ CRITICAL: ManualSequenceSender received undefined campaignId!");
+    return <div className="text-red-600">Error: Campaign ID is missing</div>;
+  }
+  
+  console.log("✅ ManualSequenceSender initialized with campaignId:", campaignId);
+  
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedLeadId, setSelectedLeadId] = useState<string>("");
   const [sequenceSteps, setSequenceSteps] = useState<SequenceStep[]>([]);
   const [selectedStepId, setSelectedStepId] = useState<string>("");
@@ -60,6 +70,7 @@ export function ManualSequenceSender({ campaignId }: { campaignId: string }) {
   const [customSubject, setCustomSubject] = useState<string>("");
   const [customBody, setCustomBody] = useState<string>("");
   const [isSending, setIsSending] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [sendHistory, setSendHistory] = useState<any[]>([]);
   
   // Prevent double-sends with a ref lock
@@ -107,6 +118,67 @@ export function ManualSequenceSender({ campaignId }: { campaignId: string }) {
   const selectedLead = leads.find(l => l.id === selectedLeadId);
   const currentLeadIndex = leads.findIndex(l => l.id === selectedLeadId);
   const nextLead = currentLeadIndex >= 0 && currentLeadIndex < leads.length - 1 ? leads[currentLeadIndex + 1] : null;
+
+  // Filter leads based on search query
+  const filteredLeads = leads.filter(lead =>
+    lead.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleSaveDraft = async () => {
+    if (!customSubject.trim() && !customBody.trim()) {
+      toast({
+        title: "Error",
+        description: "Please fill in subject or body",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSavingDraft(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/draft_emails`,
+        {
+          method: 'POST',
+          headers: {
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            'Authorization': `Bearer ${session?.access_token}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal',
+          },
+          body: JSON.stringify({
+            campaign_id: campaignId,
+            user_id: user.id,
+            subject: customSubject || "Untitled",
+            body: customBody,
+          }),
+        }
+      );
+
+      if (!response.ok) throw new Error('Failed to save draft');
+      
+      toast({
+        title: "Success",
+        description: "Email saved as draft",
+      });
+
+      // Reset form
+      setCustomSubject("");
+      setCustomBody("");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save draft",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
 
   const handleCopyLeadData = () => {
     if (!selectedLead) return;
@@ -220,6 +292,12 @@ Requirement: ${selectedLead.requirement || "N/A"}`;
       }
 
       // Send email via edge function
+      if (!campaignId || typeof campaignId !== 'string') {
+        console.error("❌ CRITICAL: campaignId is invalid:", campaignId);
+        throw new Error("Campaign ID is missing or invalid");
+      }
+      
+      console.log("📧 Sending email for manual sequence with campaignId:", campaignId);
       const { data, error } = await supabase.functions.invoke("send-email", {
         body: {
           leadId: selectedLead.id,
@@ -232,7 +310,11 @@ Requirement: ${selectedLead.requirement || "N/A"}`;
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("❌ Error from send-email function:", error);
+        throw error;
+      }
+      console.log("✅ Email sent successfully via send-email function");
 
       // Add to send history
       setSendHistory([
@@ -294,17 +376,33 @@ Requirement: ${selectedLead.requirement || "N/A"}`;
                 </span>
               )}
             </div>
+            
+            {/* Search Input */}
+            <Input
+              type="text"
+              placeholder="Search leads by name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full"
+            />
+
             <Select value={selectedLeadId} onValueChange={setSelectedLeadId}>
               <SelectTrigger id="lead">
                 <SelectValue placeholder="Select a lead..." />
               </SelectTrigger>
               <SelectContent>
-                {leads.map(lead => (
-                  <SelectItem key={lead.id} value={lead.id}>
-                    {lead.name} {lead.position ? `(${lead.position})` : ""}
-                    <span className="text-xs text-muted-foreground ml-2">{lead.email}</span>
-                  </SelectItem>
-                ))}
+                {filteredLeads.length > 0 ? (
+                  filteredLeads.map(lead => (
+                    <SelectItem key={lead.id} value={lead.id}>
+                      {lead.name} {lead.position ? `(${lead.position})` : ""}
+                      <span className="text-xs text-muted-foreground ml-2">{lead.email}</span>
+                    </SelectItem>
+                  ))
+                ) : (
+                  <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                    No leads found
+                  </div>
+                )}
               </SelectContent>
             </Select>
             {leads.length === 0 && (
@@ -354,12 +452,11 @@ Requirement: ${selectedLead.requirement || "N/A"}`;
 
               <div className="space-y-2">
                 <Label htmlFor="body">Email Body</Label>
-                <Textarea
-                  id="body"
-                  placeholder={selectedStep.config?.prompt || "Email body (optional - will use sequence prompt if empty)..."}
+                <RichTextEditor
                   value={customBody}
-                  onChange={(e) => setCustomBody(e.target.value)}
-                  className="min-h-[120px]"
+                  onChange={setCustomBody}
+                  placeholder={selectedStep.config?.prompt || "Email body (optional - will use sequence prompt if empty)..."}
+                  className="min-h-[300px]"
                 />
                 <p className="text-xs text-muted-foreground">
                   Leave empty to generate from step prompt: "{selectedStep.config?.prompt}"
@@ -379,6 +476,17 @@ Requirement: ${selectedLead.requirement || "N/A"}`;
               >
                 <Send className="w-4 h-4 mr-2" />
                 {isSending ? "Sending..." : "Send Sequence Step"}
+              </Button>
+
+              <Button
+                onClick={handleSaveDraft}
+                disabled={isSavingDraft}
+                variant="outline"
+                size="lg"
+                title="Save email as draft"
+              >
+                <Save className="w-4 h-4" />
+                {isSavingDraft ? "Saving..." : "Save as Draft"}
               </Button>
               
               <Button
